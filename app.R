@@ -17,7 +17,6 @@ library(devtools)
 #devtools::install_github("tidyverse/tidyr")
 library(tidyr)
 library(httr)
-library(viridis)
 
 default = function(xx) {
   if (length(xx) > 1) {
@@ -77,12 +76,12 @@ ui <- fluidPage(# Application title
         inline = TRUE
       ),
       uiOutput("country_selector"),
-      sliderInput(
-        "span",
-        "Amount of smoothing to apply (0 for no smoothing)",
-        min = 0,
-        max = 1,
-        value = 0.5
+      radioButtons(
+        "smoothing",
+        "Use smoothing (simpler graphs)",
+        choices = c("yes", "no"),
+        # selectd = "yes",
+        inline = TRUE
       )
     ),
 
@@ -102,18 +101,28 @@ process_data = function(input) {
       date <= input$date_range[2]
     ) %>%
     arrange(date)
-  data = pivot_longer(
-    data = pivot_wider(
-      data = data,
+  countries = sort(unique(data$Country.Region))
+  data = data %>%
+    pivot_wider(
       names_from = Country.Region,
       values_from = cases,
       values_fill = 0.1
-    ),
-    cols = unique(data$Country.Region) ,
-    names_to = "Country.Region",
-    values_to = "cases"
-  )
-  countries = sort(unique(data$Country.Region))
+    )
+  if (input$smoothing == "yes")
+  {
+    data =
+      mutate_if(
+        data,
+        .predicate = is.numeric,
+        .funs = function(y) {
+          supsmu(1:length(y), y)$y
+        }
+      )
+  }
+  data =   pivot_longer(data,
+                        cols = countries ,
+                        names_to = "Country.Region",
+                        values_to = "cases")
   list(data = filter(data, Country.Region %in% input$country),
        countries = countries)
 }
@@ -123,15 +132,10 @@ server <- function(input, output, session) {
     pd = process_data(input)
     data = pd$data
     countries = pd$countries
-    if (input$span == 0) {
-      main_geom = geom_line()
-    }
-    else {
-      main_geom = geom_smooth(se = FALSE, span = input$span)
-    }
 
-    data$wrap = paste("Group", as.integer(as.factor(data$Country.Region))%%(length(countries)%/%6))
-    ggplot(
+    data$wrap = paste("Group", as.integer(as.factor(data$Country.Region)) %%
+                        (length(input$country) %/% 6))
+    plot = ggplot(
       data = data,
       mapping = aes(
         x = date,
@@ -140,11 +144,14 @@ server <- function(input, output, session) {
         color = Country.Region
       )
     ) +
-      main_geom +
+      geom_line() +
       geom_dl(method = "angled.boxes") +
       scale_y_log10() +
-      facet_wrap(facets = ~wrap) +
-      theme(legend.position="none")
+      theme(legend.position = "none")
+    if (length(input$country) > 6) {
+      plot = plot + facet_wrap(facets = ~ wrap)
+    }
+    plot
   }, height = 800)
   output$country_selector = renderUI({
     pd = process_data(input)
@@ -154,7 +161,11 @@ server <- function(input, output, session) {
       "country",
       "Country",
       choices = countries,
-      selected = if(is.null(input$country)){ countries} else {input$country},
+      selected = if (is.null(input$country)) {
+        countries
+      } else {
+        input$country
+      },
       multiple = TRUE
     )
   })
