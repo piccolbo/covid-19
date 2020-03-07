@@ -17,7 +17,7 @@ library(devtools)
 #devtools::install_github("tidyverse/tidyr")
 library(tidyr)
 library(httr)
-
+library(viridis)
 
 default = function(xx) {
   if (length(xx) > 1) {
@@ -129,6 +129,8 @@ server <- function(input, output, session) {
     else {
       main_geom = geom_smooth(se = FALSE, span = input$span)
     }
+
+    data$wrap = paste("Group", as.integer(as.factor(data$Country.Region))%%(length(countries)%/%6))
     ggplot(
       data = data,
       mapping = aes(
@@ -139,8 +141,10 @@ server <- function(input, output, session) {
       )
     ) +
       main_geom +
-      geom_dl(method = "last.bumpup") +
-      scale_y_log10()
+      geom_dl(method = "angled.boxes") +
+      scale_y_log10() +
+      facet_wrap(facets = ~wrap) +
+      theme(legend.position="none")
   }, height = 800)
   output$country_selector = renderUI({
     pd = process_data(input)
