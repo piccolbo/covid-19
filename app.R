@@ -85,20 +85,24 @@ ui <- fluidPage(# Application title
       )
     ),
 
-    # Show a plot of the generated distribution
-    mainPanel(plotOutput("distPlot"))
+    mainPanel(tabsetPanel(
+      tabPanel("Plot", plotOutput("cases")),
+      tabPanel("Days to doubling", dataTableOutput("growth")),
+      # tabPanel("Data", dataTableOutput("data")),
+      tabPanel("Methods", "Data from https://github.com/CSSEGISandData/COVID-19 via https://github.com/RamiKrispin/coronavirus. Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale. \"Days to double\" is a rough estimate of how many days it takes for cases to double. These choices are reasonable given a visual inspection of the data but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage are roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. One caveat is that confirmed cases per day may be capped by detection capacity and censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly")
+    ))
   ))
 
-process_data = function(input) {
+process_data = function(options, smoothing = NULL) {
   data = coronavirus %>%
     group_by(Country.Region, type, date) %>%
     summarise(cases = as.double(sum(cases))) %>%
     filter(
       cases > 0,
-      max(cases) > input$min_cases,
-      type == input$type,
-      date >= input$date_range[1],
-      date <= input$date_range[2]
+      max(cases) > options$min_cases,
+      type == options$type,
+      date >= options$date_range[1],
+      date <= options$date_range[2]
     ) %>%
     arrange(date)
   countries = sort(unique(data$Country.Region))
@@ -108,7 +112,7 @@ process_data = function(input) {
       values_from = cases,
       values_fill = 0.1
     )
-  if (input$smoothing == "yes")
+  if (options$smoothing == "yes" || (!is.null(smoothing) && smoothing))
   {
     data =
       mutate_if(
@@ -123,12 +127,23 @@ process_data = function(input) {
                         cols = countries ,
                         names_to = "Country.Region",
                         values_to = "cases")
-  list(data = filter(data, Country.Region %in% input$country),
-       countries = countries)
+  data = mutate(data, logcases = log2(cases + 0.1))
+  n_days_ago = tail(sort(unique(data$date)), 5)[1]
+  growth = data %>%
+    filter(date >= n_days_ago) %>%
+    group_by(Country.Region) %>%
+    summarize(growth.rate = (lm(formula = logcases ~ date)$coeff[2])) %>%
+    mutate(days.to.double = 1 / growth.rate)
+  list(
+    data = filter(data, Country.Region %in% options$country),
+    countries = countries,
+    growth = growth
+  )
 }
+
 server <- function(input, output, session) {
   countries = sort(unique(coronavirus$Country.Region))
-  output$distPlot <- renderPlot({
+  output$cases <- renderPlot({
     pd = process_data(input)
     data = pd$data
     countries = pd$countries
@@ -153,6 +168,12 @@ server <- function(input, output, session) {
     }
     plot
   }, height = 800)
+  output$growth = renderDataTable({
+    process_data(input, smoothing=TRUE)$growth
+  }, options = list(order = list(list(2, 'desc'))))
+  output$data = renderDataTable({
+    process_data(input)$data
+  })
   output$country_selector = renderUI({
     pd = process_data(input)
     data = pd$data
@@ -169,7 +190,6 @@ server <- function(input, output, session) {
       multiple = TRUE
     )
   })
-
 }
 
 # Run the application
