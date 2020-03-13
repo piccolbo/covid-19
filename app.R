@@ -8,27 +8,33 @@
 #
 
 library(shiny)
-#devtools::install_github("RamiKrispin/coronavirus")
-#library(coronavirus)
 library(ggplot2)
 library(dplyr)
 library(directlabels)
 library(devtools)
-#devtools::install_github("tidyverse/tidyr")
 library(tidyr)
 library(httr)
 library(DT)
 
 
-unlink('coronavirus.rda')
-con = file('coronavirus.rda', 'wb')
-writeBin(content(
-  GET(url = 'https://raw.githubusercontent.com/RamiKrispin/coronavirus/master/data/coronavirus.rda')
-), con)
-close(con)
-load('coronavirus.rda')
-unlink('coronavirus.rda')
-all_countries = sort(unique(coronavirus$Country.Region))
+
+
+corona_wide = bind_rows(
+  .id = "type",
+  confirmed = readr::read_csv(
+    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
+  ),
+  deaths = readr::read_csv(
+    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
+  ),
+  recovered = readr::read_csv(
+    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv"
+  )
+)
+
+all_countries = sort(unique(corona_wide$`Country/Region`))
+
+all_dates = purrr::discard(lubridate::mdy(colnames(corona_wide)), .p = is.na)
 
 options(DT.fillContainer = FALSE)
 options(DT.autoHideNavigation = FALSE)
@@ -37,7 +43,7 @@ ui <- fluidPage(# Application title
   titlePanel(
     paste(
       "Daily cases per country, confirmed, updated",
-      as.character(max(coronavirus$date))
+      as.character(max(all_dates))
     )
   ),
 
@@ -47,15 +53,15 @@ ui <- fluidPage(# Application title
       dateRangeInput(
         "date_range",
         "Date range",
-        start = max(coronavirus$date) - 15,
-        end = max(coronavirus$date),
-        min = min(coronavirus$date),
-        max = max(coronavirus$date)
+        start = max(all_dates) - 15,
+        end = max(all_dates),
+        min = min(all_dates),
+        max = max(all_dates)
       ),
       radioButtons(
         "type",
         "Type",
-        choices = unique(coronavirus$type),
+        choices = unique(corona_wide$type),
         selected = "confirmed",
         inline = TRUE
       ),
@@ -71,10 +77,10 @@ ui <- fluidPage(# Application title
     mainPanel(tabsetPanel(
       tabPanel("Plot", plotOutput("cases")),
       tabPanel("Days to doubling", dataTableOutput("growth")),
-      tabPanel("Data", dataTableOutput("data")),
+      # tabPanel("Data", dataTableOutput("data")),
       tabPanel(
         "Methods",
-        "Data from https://github.com/CSSEGISandData/COVID-19 via https://github.com/RamiKrispin/coronavirus. Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale. \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. One caveat is that confirmed cases per day may be capped by detection capacity and censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
+        "Data from https://github.com/CSSEGISandData/COVID-19  Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale. \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. \"Days to 1M\" likewise. These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. I do have a background in science, but this has been hastly produced and not peer-reviewed. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. Major caveat is that confirmed cases per day may be capped by detection capacity for large outbreaks or in countries run by incompetent people and by censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
       )
     ))
   ))
@@ -83,19 +89,20 @@ decimal_trunc = function(x)
   trunc(x * 100) / 100
 
 process_data = function(options, smoothing = NULL) {
-  data = coronavirus %>%
-    group_by(Country.Region, type, date) %>%
-    summarise(cases = as.double(sum(cases))) %>%
-    filter(cases > 0,
-           type == options$type) %>%
-    arrange(date)
-  all_data_countries = sort(unique(data$Country.Region))
-  data = data %>%
-    pivot_wider(
-      names_from = Country.Region,
-      values_from = cases,
-      values_fill = 0.1
+  data = corona_wide %>%
+    filter(type  == options$type) %>%
+    pivot_longer(cols = ends_with("/20")) %>%
+    group_by(`Country/Region`, name) %>% summarise(cases = sum(value)) %>%
+    mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
+    pivot_wider(names_from = c("Country/Region"),
+                values_from = cases) %>%
+    arrange(date) %>%
+    mutate_if(
+      .predicate = is.numeric,
+      .funs = function(x)
+        0.1 + c(0, diff(x))
     )
+
   if (options$smoothing == "yes" ||
       (!is.null(smoothing) && smoothing))
   {
@@ -108,32 +115,36 @@ process_data = function(options, smoothing = NULL) {
         }
       )
   }
-  data =  pivot_longer(data,
-                       cols = all_data_countries,
-                       names_to = "Country.Region",
-                       values_to = "cases")
-  data = mutate(data, logcases = log2(cases + 0.1)) %>%
-    filter(date >= options$date_range[1],
-           date <= options$date_range[2])
+  data =
+    pivot_longer(
+      data,
+      cols = tail(colnames(data),-1),
+      names_to = "Country.Region",
+      values_to = "cases"
+    )
+  data = mutate(data, log2cases = log2(ifelse(cases > 0, cases, 0.1)))
   n_days_ago = tail(sort(unique(data$date)), 5)[1]
   growth = data %>%
     filter(date >= n_days_ago) %>%
     group_by(Country.Region) %>%
     arrange(date) %>%
-    summarize(growth.rate = (lm(formula = logcases ~ date)$coeff[2]),
-              latest_cases = last(logcases)) %>%
-    mutate(days.to.double = decimal_trunc(1 / growth.rate),
-           growth.rate = decimal_trunc(growth.rate)) %>%
+    summarize(
+      log2.growth.rate = (lm(formula = log2cases ~ date)$coeff[2]),
+      log2.latest.cases = last(log2cases)
+    ) %>%
+    mutate(
+      growth.rate = 2 ** log2.growth.rate,
+      days.to.double = trunc(10 / log2.growth.rate)/10
+    ) %>%
     mutate(days.to.1M = {
-      d = (log2(10E6) - latest_cases) / growth.rate
-      ifelse(d>0,trunc(d), Inf)
+      d = (log2(10E6) - log2.latest.cases) / log2.growth.rate
+      ifelse(d > 0, trunc(d), Inf)
     }) %>%
-    mutate(daily.growth.percent = trunc(((2**growth.rate)-1)*100)) %>%
-    select(-latest_cases, -growth.rate)
-
+    mutate(daily.growth.percent = trunc((growth.rate -1) * 100)) %>%
+    dplyr::select(Country.Region,days.to.double, days.to.1M, daily.growth.percent)
   high_cases_countries = (
     data %>%
-      filter(type  == "confirmed", date == max(date)) %>%
+      filter(date == max(date)) %>%
       group_by(Country.Region) %>%
       arrange(-cases) %>%
       head(12)
@@ -152,7 +163,8 @@ process_data = function(options, smoothing = NULL) {
 server <- function(input, output, session) {
   output$cases <- renderPlot({
     pd = process_data(input)
-    data = pd$data
+    data = pd$data    %>%  filter(date >= input$date_range[1],
+                                  date <= input$date_range[2])
     countries = sort(unique(data$Country.Region))
     plot = ggplot(
       data = data,
