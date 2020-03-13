@@ -65,6 +65,12 @@ ui <- fluidPage(# Application title
         selected = "confirmed",
         inline = TRUE
       ),
+      radioButtons(
+        "density",
+        "Convert to density(cases per 1M people)",
+        choices = c("yes", "no"),
+        inline = TRUE
+      ),
       uiOutput("country_selector"),
       radioButtons(
         "smoothing",
@@ -80,7 +86,7 @@ ui <- fluidPage(# Application title
       # tabPanel("Data", dataTableOutput("data")),
       tabPanel(
         "Methods",
-        "Data from https://github.com/CSSEGISandData/COVID-19  Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale. \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. \"Days to 1M\" likewise. These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. I do have a background in science, but this has been hastly produced and not peer-reviewed. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. Major caveat is that confirmed cases per day may be capped by detection capacity for large outbreaks or in countries run by incompetent people and by censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
+        "Data from https://github.com/CSSEGISandData/COVID-19  Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale. \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. \"Days to 1M\" likewise (per day). These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. I do have a background in science, but this has been hastly produced and not peer-reviewed. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. Major caveat is that confirmed cases per day may be capped by detection capacity for large outbreaks or in countries run by incompetent people and by censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
       )
     ))
   ))
@@ -88,41 +94,55 @@ ui <- fluidPage(# Application title
 decimal_trunc = function(x)
   trunc(x * 100) / 100
 
+diff_smooth = function(x, smoothing) {
+  x = 0.1 + c(0, diff(x))
+  if (smoothing) {
+    x = supsmu(1:length(x), x)$y
+  }
+  x
+}
+
 process_data = function(options, smoothing = NULL) {
+  smoothing = (if (is.null(smoothing))
+    options$smoothing == "yes"
+    else
+      smoothing)
   data = corona_wide %>%
     filter(type  == options$type) %>%
     pivot_longer(cols = ends_with("/20")) %>%
     group_by(`Country/Region`, name) %>% summarise(cases = sum(value)) %>%
     mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
-    pivot_wider(names_from = c("Country/Region"),
-                values_from = cases) %>%
     arrange(date) %>%
-    mutate_if(
-      .predicate = is.numeric,
-      .funs = function(x)
-        0.1 + c(0, diff(x))
-    )
+    mutate(cases = diff_smooth(cases, smoothing)) %>%
+    rename(Country.Region = "Country/Region")
 
-  if (options$smoothing == "yes" ||
-      (!is.null(smoothing) && smoothing))
-  {
-    data =
-      mutate_if(
-        data,
-        .predicate = is.numeric,
-        .funs = function(y) {
-          supsmu(1:length(y), y)$y
-        }
-      )
-  }
-  data =
-    pivot_longer(
-      data,
-      cols = tail(colnames(data),-1),
-      names_to = "Country.Region",
-      values_to = "cases"
-    )
   data = mutate(data, log2cases = log2(ifelse(cases > 0, cases, 0.1)))
+
+  country_translate = function(x) {
+    name_translation = c(
+      "US" = "United States",
+      "Slovakia" = "Slovak Republic",
+      "Russia" = "Russian Federation",
+      "Korea, South" = "Korea, Rep.",
+      "Iran" = "Iran, Islamic Rep.",
+      "Egypt" = "Egypt, Arab Rep.",
+      "Czechia" = "Czech Republic",
+      "Brunei" = "Brunei Darussalam"
+    )
+    trn = names(name_translation)
+    names(trn) = name_translation
+    if (is.na(trn[x]))
+        x
+    else
+      trn[x]
+  }
+  pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
+    mutate(country = unlist(purrr::map(.x = country, .f = country_translate)))
+  data = left_join(
+    data,
+    pop_data %>% select(country, population = value),
+    by = c("Country.Region" = "country")
+  )
   n_days_ago = tail(sort(unique(data$date)), 5)[1]
   growth = data %>%
     filter(date >= n_days_ago) %>%
@@ -134,14 +154,17 @@ process_data = function(options, smoothing = NULL) {
     ) %>%
     mutate(
       growth.rate = 2 ** log2.growth.rate,
-      days.to.double = trunc(10 / log2.growth.rate)/10
+      days.to.double = decimal_trunc(1 / log2.growth.rate)
     ) %>%
     mutate(days.to.1M = {
       d = (log2(10E6) - log2.latest.cases) / log2.growth.rate
       ifelse(d > 0, trunc(d), Inf)
     }) %>%
-    mutate(daily.growth.percent = trunc((growth.rate -1) * 100)) %>%
-    dplyr::select(Country.Region,days.to.double, days.to.1M, daily.growth.percent)
+    mutate(daily.growth.percent = decimal_trunc(growth.rate - 1)) %>%
+    dplyr::select(Country.Region,
+                  days.to.double,
+                  days.to.1M,
+                  daily.growth.percent)
   high_cases_countries = (
     data %>%
       filter(date == max(date)) %>%
@@ -170,7 +193,7 @@ server <- function(input, output, session) {
       data = data,
       mapping = aes(
         x = date,
-        y = cases,
+        y = cases/(if(input$density=="yes") population/1E5 else 1),
         label = Country.Region,
         color = Country.Region
       )
@@ -178,6 +201,7 @@ server <- function(input, output, session) {
       geom_line() +
       geom_dl(method = "angled.boxes") +
       scale_y_log10(labels = identity) +
+      xlab(paste("cases",( if(input$density=="yes") "per hundred thousands" else  ""))) +
       theme(legend.position = "none")
     plot
   }, height = 800)
