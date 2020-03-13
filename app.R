@@ -15,7 +15,7 @@ library(devtools)
 library(tidyr)
 library(httr)
 library(DT)
-
+library(wbstats)
 
 
 
@@ -136,6 +136,9 @@ process_data = function(options, smoothing = NULL) {
     else
       trn[x]
   }
+
+  spy = function(x, f) {message(f(x)); x}
+
   pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
     mutate(country = unlist(purrr::map(.x = country, .f = country_translate)))
   data = left_join(
@@ -143,9 +146,10 @@ process_data = function(options, smoothing = NULL) {
     pop_data %>% select(country, population = value),
     by = c("Country.Region" = "country")
   )
-  n_days_ago = tail(sort(unique(data$date)), 5)[1]
+  n_days_ago = tail(sort(unique(data$date)), 6)[1]
+  last_day = max(data$date)
   growth = data %>%
-    filter(date >= n_days_ago) %>%
+    filter(date >= n_days_ago, date < last_day) %>%
     group_by(Country.Region) %>%
     arrange(date) %>%
     summarize(
@@ -160,7 +164,7 @@ process_data = function(options, smoothing = NULL) {
       d = (log2(10E6) - log2.latest.cases) / log2.growth.rate
       ifelse(d > 0, trunc(d), Inf)
     }) %>%
-    mutate(daily.growth.percent = decimal_trunc(growth.rate - 1)) %>%
+    mutate(daily.growth.percent = trunc((growth.rate - 1)*100)) %>%
     dplyr::select(Country.Region,
                   days.to.double,
                   days.to.1M,
@@ -201,7 +205,7 @@ server <- function(input, output, session) {
       geom_line() +
       geom_dl(method = "angled.boxes") +
       scale_y_log10(labels = identity) +
-      xlab(paste("cases",( if(input$density=="yes") "per hundred thousands" else  ""))) +
+      ylab(paste("cases",( if(input$density=="yes") "per hundred thousands" else  ""))) +
       theme(legend.position = "none")
     plot
   }, height = 800)
