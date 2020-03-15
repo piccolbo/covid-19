@@ -132,10 +132,9 @@ unsafe_process_data = function(options, smoothing) {
     group_by(`Country/Region`, name) %>% summarise(cases = sum(value)) %>%
     mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
     arrange(date) %>%
-    mutate(cases = diff_smooth(cases, smoothing)) %>%
-    rename(Country.Region = "Country/Region")
-
-  data = mutate(data, log2cases = log2(ifelse(cases > 0, cases, 0.1)))
+    mutate(total.cases = cases, cases = diff_smooth(cases, smoothing)) %>%
+    rename(Country.Region = "Country/Region") %>%
+    mutate(log2cases = log2(ifelse(cases > 0, cases, 0.1)))
 
   country_translate = function(x) {
     name_translation = c(
