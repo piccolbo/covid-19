@@ -150,7 +150,7 @@ unsafe_process_data = function(options, smoothing) {
     trn = names(name_translation)
     names(trn) = name_translation
     if (is.na(trn[x]))
-        x
+      x
     else
       trn[x]
   }
