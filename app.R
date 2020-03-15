@@ -171,7 +171,9 @@ unsafe_process_data = function(options, smoothing) {
     arrange(date) %>%
     summarize(
       log2.growth.rate = (lm(formula = log2cases ~ date)$coeff[2]),
-      log2.latest.cases = last(log2cases)
+      log2.latest.cases = last(log2cases),
+      latest.total.cases = last(total.cases),
+      population = last(population)
     ) %>%
     mutate(
       growth.rate = 2 ** log2.growth.rate,
@@ -181,11 +183,13 @@ unsafe_process_data = function(options, smoothing) {
       d = (log2(10E6) - log2.latest.cases) / log2.growth.rate
       ifelse(d > 0, trunc(d), Inf)
     }) %>%
-    mutate(daily.growth.percent = trunc((growth.rate - 1)*100)) %>%
-    dplyr::select(Country.Region,
-                  days.to.double,
-                  days.to.1M,
-                  daily.growth.percent)
+    mutate(
+      daily.growth.percent = trunc((growth.rate - 1) * 100),
+      latest.cases = trunc(2 ** log2.latest.cases),
+      latest.cases.per.hundred.thousand = decimal_trunc(latest.cases * 1E5 / population)
+    ) %>%
+    dplyr::select(-starts_with("log2"), -growth.rate,-population)
+
   high_cases_countries = (
     data %>%
       filter(date == max(date)) %>%
@@ -214,7 +218,10 @@ server <- function(input, output, session) {
       data = data,
       mapping = aes(
         x = date,
-        y = cases/(if(input$density=="yes") population/1E5 else 1),
+        y = cases / (if (input$density == "yes")
+          population / 1E5
+          else
+            1),
         label = Country.Region,
         color = Country.Region
       )
@@ -222,13 +229,16 @@ server <- function(input, output, session) {
       geom_line() +
       geom_dl(method = "angled.boxes") +
       scale_y_log10(labels = identity) +
-      ylab(paste("cases",( if(input$density=="yes") "per hundred thousands" else  ""))) +
+      ylab(paste("cases", (if (input$density == "yes")
+        "per hundred thousands"
+        else
+          ""))) +
       theme(legend.position = "none")
     plot
   }, height = 800)
   output$growth = renderDataTable({
     process_data(input, smoothing = TRUE)$growth
-  }, options = list(order = list(list(4, 'desc'))))
+  }, options = list(order = list(list(5, 'desc'))))
   output$data = renderDataTable({
     process_data(input)$data
   })
