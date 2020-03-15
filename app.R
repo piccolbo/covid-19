@@ -94,15 +94,34 @@ ui <- fluidPage(# Application title
 decimal_trunc = function(x)
   trunc(x * 100) / 100
 
+
 diff_smooth = function(x, smoothing) {
-  x = 0.1 + c(0, diff(x))
+  bottom = 1
+  x = pmax(bottom, x)
   if (smoothing) {
-    x = supsmu(1:length(x), x)$y
+    pmax(bottom, c(bottom, diff(exp(
+      supsmu(1:length(x), log(x))$y
+    ))))
   }
+  else
+    c(bottom, diff(x))
+}
+
+spy = function(x, f) {
+  message(do.call(paste, as.list(f(x))))
   x
 }
 
 process_data = function(options, smoothing = NULL) {
+  tryCatch (
+    unsafe_process_data(options, smoothing),
+    error = function(e) {
+      corona_wide = select(corona_wide, -NCOL(corona_wide))
+    }
+  )
+}
+
+unsafe_process_data = function(options, smoothing) {
   smoothing = (if (is.null(smoothing))
     options$smoothing == "yes"
     else
