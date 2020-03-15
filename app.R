@@ -155,7 +155,6 @@ unsafe_process_data = function(options, smoothing) {
       trn[x]
   }
 
-  spy = function(x, f) {message(f(x)); x}
 
   pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
     mutate(country = unlist(purrr::map(.x = country, .f = country_translate)))
