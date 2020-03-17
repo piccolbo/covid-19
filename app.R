@@ -32,7 +32,6 @@ corona_wide = bind_rows(
   )
 )
 
-all_countries = sort(unique(corona_wide$`Country/Region`))
 
 all_dates = purrr::discard(lubridate::mdy(colnames(corona_wide)), .p = is.na)
 
@@ -42,12 +41,11 @@ options(DT.autoHideNavigation = FALSE)
 ui <- fluidPage(# Application title
   titlePanel(
     paste(
-      "Daily cases per country, confirmed, updated",
+      "Daily cases per country or state, confirmed, updated",
       as.character(max(all_dates))
     )
   ),
 
-  # Sidebar with a slider input for number of bins
   sidebarLayout(
     sidebarPanel(
       dateRangeInput(
@@ -66,12 +64,19 @@ ui <- fluidPage(# Application title
         inline = TRUE
       ),
       radioButtons(
-        "density",
-        "Convert to density(cases per 1M people)",
-        choices = c("yes", "no"),
+        "world_or_US",
+        "Show countries or US States",
+        choices = c("Countries", "US States"),
+        selected = "Countries",
         inline = TRUE
       ),
-      uiOutput("country_selector"),
+      radioButtons(
+        "density",
+        "Convert to density(cases per 1M people)",
+        choices = c("no", "yes"),
+        inline = TRUE
+      ),
+      uiOutput("region_selector"),
       radioButtons(
         "smoothing",
         "Use smoothing (simpler graphs)",
@@ -96,7 +101,7 @@ decimal_trunc = function(x)
 
 
 diff_smooth = function(x, smoothing) {
-  bottom = 1
+  bottom = .1
   x = pmax(bottom, x)
   if (smoothing) {
     pmax(bottom, c(bottom, diff(exp(
@@ -108,15 +113,48 @@ diff_smooth = function(x, smoothing) {
 }
 
 spy = function(x, f) {
-  message(do.call(paste, as.list(f(x))))
+  print(do.call(paste, as.list(f(x))))
   x
+}
+
+country_translate = function(x) {
+  name_translation = c(
+    "US" = "United States",
+    "Slovakia" = "Slovak Republic",
+    "Russia" = "Russian Federation",
+    "Korea, South" = "Korea, Rep.",
+    "Iran" = "Iran, Islamic Rep.",
+    "Egypt" = "Egypt, Arab Rep.",
+    "Czechia" = "Czech Republic",
+    "Brunei" = "Brunei Darussalam"
+  )
+  trn = names(name_translation)
+  names(trn) = name_translation
+  if (is.na(trn[x]))
+    x
+  else
+    trn[x]
+}
+
+county_state_map = function(x) {
+  v = state.name
+  names(v) = state.abb
+  y = v[strsplit(x,split = ", ", fixed = TRUE)[[1]][2]]
+  if (is.na(y)) x else y
+}
+
+state_abb_map = function(x) {
+  v = state.name
+  names(v) = state.abb
+  y = v[x]
+  if (is.na(y)) 1 else y
 }
 
 process_data = function(options, smoothing = NULL) {
   tryCatch (
     unsafe_process_data(options, smoothing),
     error = function(e) {
-      corona_wide = select(corona_wide, -NCOL(corona_wide))
+      corona_wide = select(corona_wide,-NCOL(corona_wide))
     }
   )
 }
@@ -126,48 +164,72 @@ unsafe_process_data = function(options, smoothing) {
     options$smoothing == "yes"
     else
       smoothing)
+  world = options$world_or_US == "Countries"
   data = corona_wide %>%
     filter(type  == options$type) %>%
     pivot_longer(cols = ends_with("/20")) %>%
-    group_by(`Country/Region`, name) %>% summarise(cases = sum(value)) %>%
-    mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
-    arrange(date) %>%
-    mutate(total.cases = cases, cases = diff_smooth(cases, smoothing)) %>%
-    rename(Country.Region = "Country/Region") %>%
-    mutate(log2cases = log2(ifelse(cases > 0, cases, 0.1)))
+    mutate(date = lubridate::mdy(name)) %>% select(-name)
 
-  country_translate = function(x) {
-    name_translation = c(
-      "US" = "United States",
-      "Slovakia" = "Slovak Republic",
-      "Russia" = "Russian Federation",
-      "Korea, South" = "Korea, Rep.",
-      "Iran" = "Iran, Islamic Rep.",
-      "Egypt" = "Egypt, Arab Rep.",
-      "Czechia" = "Czech Republic",
-      "Brunei" = "Brunei Darussalam"
-    )
-    trn = names(name_translation)
-    names(trn) = name_translation
-    if (is.na(trn[x]))
-      x
-    else
-      trn[x]
+  data =  if (world) {
+    rename(data, region = "Country/Region")
+  }
+  else{
+    rename(data, region = "Province/State") %>%
+      filter(`Country/Region` == "US") %>%
+      mutate(region = sapply(region, county_state_map))
   }
 
 
-  pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
-    mutate(country = unlist(purrr::map(.x = country, .f = country_translate)))
-  data = left_join(
-    data,
-    pop_data %>% select(country, population = value),
-    by = c("Country.Region" = "country")
-  )
-  n_days_ago = tail(sort(unique(data$date)), 6)[1]
+  data =
+    group_by(data, region, date) %>%
+    summarise(cases = sum(value)) %>%
+    arrange(date) %>%
+    mutate(total.cases = cases, cases = diff_smooth(cases, smoothing)) %>%
+    mutate(log2cases = log2(ifelse(cases > 0, cases, 0.1)))
+
+
+  if (world) {
+    pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
+      mutate(country =
+               unlist(purrr::map(.x = country, .f = country_translate)))
+    data = left_join(
+      data,
+      pop_data %>% select(country, population = value),
+      by = c("region" = "country")
+    )
+  }
+  else{
+    state_pop = jsonlite::fromJSON(file("us_state_pops.json"))
+    state_pop = tibble(name = sapply(names(state_pop), state_abb_map),
+                       population = unlist(state_pop))
+    data = left_join(data,
+                     state_pop,
+                     by = c("region" = "name"))
+  }
+  data
+}
+
+
+high_cases_regions = function(data){
+  (data %>%
+    filter(date == max(date)) %>%
+    group_by(region) %>%
+    arrange(-cases) %>%
+    head(12)
+  )$region}
+
+filter_regions = function(data, regions) {
+  filter(data,
+         region %in% regions)
+  }
+
+trend_calc = function(data) {
+  n_days_ago = tail(sort(unique(data$date)), 5)[1]
   last_day = max(data$date)
-  growth = data %>%
-    filter(date >= n_days_ago, date < last_day) %>%
-    group_by(Country.Region) %>%
+
+  data %>%
+    filter(date >= n_days_ago, date <= last_day) %>%
+    group_by(region) %>%
     arrange(date) %>%
     summarize(
       log2.growth.rate = (lm(formula = log2cases ~ date)$coeff[2]),
@@ -186,34 +248,19 @@ unsafe_process_data = function(options, smoothing) {
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
       latest.cases = trunc(2 ** log2.latest.cases),
-      latest.cases.per.hundred.thousand = decimal_trunc(latest.cases * 1E5 / population)
+     latest.cases.per.hundred.thousand = decimal_trunc(latest.cases * 1E5 / population)
     ) %>%
-    dplyr::select(-starts_with("log2"), -growth.rate,-population)
-
-  high_cases_countries = (
-    data %>%
-      filter(date == max(date)) %>%
-      group_by(Country.Region) %>%
-      arrange(-cases) %>%
-      head(12)
-  )$Country.Region
-
-  list(data = filter(
-    data,
-    Country.Region %in% (if (!is.null(options$country))
-      options$country
-      else
-        high_cases_countries)
-  ),
-  growth = growth)
+    dplyr::select(-starts_with("log2"),-growth.rate, -population)
 }
 
+
 server <- function(input, output, session) {
+  reset_selection = FALSE
   output$cases <- renderPlot({
-    pd = process_data(input)
-    data = pd$data    %>%  filter(date >= input$date_range[1],
-                                  date <= input$date_range[2])
-    countries = sort(unique(data$Country.Region))
+    data = process_data(input) %>%
+      filter(date >= input$date_range[1],
+             date <= input$date_range[2]) %>%
+      filter_regions(input$regions)
     plot = ggplot(
       data = data,
       mapping = aes(
@@ -222,8 +269,8 @@ server <- function(input, output, session) {
           population / 1E5
           else
             1),
-        label = Country.Region,
-        color = Country.Region
+        label = region,
+        color = region
       )
     ) +
       geom_line() +
@@ -237,22 +284,22 @@ server <- function(input, output, session) {
     plot
   }, height = 800)
   output$growth = renderDataTable({
-    process_data(input, smoothing = TRUE)$growth
+    trend_calc(process_data(input, smoothing = TRUE))
   }, options = list(order = list(list(5, 'desc'))))
   output$data = renderDataTable({
-    process_data(input)$data
+    process_data(input)
   })
-  output$country_selector = renderUI({
-    pd = process_data(input)
-    data = pd$data
+  output$region_selector = renderUI({
+    data = process_data(input)
+    all_regions = sort(unique(data$region))
     selectizeInput(
-      "country",
-      "Country (biggest current outbreaks shown, click for more)",
-      choices = all_countries,
-      selected = if (is.null(input$country)) {
-        sort(unique(data$Country.Region))
+      "regions",
+      "Region (biggest current outbreaks shown, click for more)",
+      choices = all_regions,
+      selected = if (is.null(input$regions) || !all(input$regions%in% all_regions)) {
+        high_cases_regions(data)
       } else {
-        input$country
+        input$regions
       },
       multiple = TRUE
     )
