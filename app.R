@@ -226,7 +226,7 @@ filter_regions = function(data, regions) {
   }
 
 trend_calc = function(data) {
-  n_days_ago = tail(sort(unique(data$date)), 5)[1]
+  n_days_ago = tail(sort(unique(data$date)), 2)[1]
   last_day = max(data$date)
 
   data %>%
