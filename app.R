@@ -168,7 +168,9 @@ unsafe_process_data = function(options, smoothing) {
   data = corona_wide %>%
     filter(type  == options$type) %>%
     pivot_longer(cols = ends_with("/20")) %>%
-    mutate(date = lubridate::mdy(name)) %>% select(-name)
+    mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
+    mutate(cases = replace_na(value, 0))
+
 
   data =  if (world) {
     rename(data, region = "Country/Region")
