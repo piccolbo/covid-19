@@ -139,22 +139,28 @@ country_translate = function(x) {
 county_state_map = function(x) {
   v = state.name
   names(v) = state.abb
-  y = v[strsplit(x,split = ", ", fixed = TRUE)[[1]][2]]
-  if (is.na(y)) x else y
+  y = v[strsplit(x, split = ", ", fixed = TRUE)[[1]][2]]
+  if (is.na(y))
+    x
+  else
+    y
 }
 
 state_abb_map = function(x) {
   v = state.name
   names(v) = state.abb
   y = v[x]
-  if (is.na(y)) 1 else y
+  if (is.na(y))
+    1
+  else
+    y
 }
 
 process_data = function(options, smoothing = NULL) {
   tryCatch (
     unsafe_process_data(options, smoothing),
     error = function(e) {
-      corona_wide = select(corona_wide,-NCOL(corona_wide))
+      corona_wide = select(corona_wide, -NCOL(corona_wide))
     }
   )
 }
@@ -184,7 +190,7 @@ unsafe_process_data = function(options, smoothing) {
 
   data =
     group_by(data, region, date) %>%
-    summarise(cases = sum(value)) %>%
+    summarise(cases = sum(cases)) %>%
     arrange(date) %>%
     mutate(total.cases = cases, cases = diff_smooth(cases, smoothing)) %>%
     mutate(log2cases = log2(ifelse(cases > 0, cases, 0.1)))
@@ -194,16 +200,15 @@ unsafe_process_data = function(options, smoothing) {
     pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
       mutate(country =
                unlist(purrr::map(.x = country, .f = country_translate)))
-    data = left_join(
-      data,
-      pop_data %>% select(country, population = value),
-      by = c("region" = "country")
-    )
+    data = left_join(data,
+                     pop_data %>% select(country, population = value),
+                     by = c("region" = "country"))
   }
   else{
     state_pop = jsonlite::fromJSON(file("us_state_pops.json"))
-    state_pop = tibble(name = sapply(names(state_pop), state_abb_map),
-                       population = unlist(state_pop))
+    state_pop =
+      tibble(name = sapply(names(state_pop), state_abb_map),
+             population = unlist(state_pop))
     data = left_join(data,
                      state_pop,
                      by = c("region" = "name"))
@@ -212,18 +217,18 @@ unsafe_process_data = function(options, smoothing) {
 }
 
 
-high_cases_regions = function(data){
+high_cases_regions = function(data) {
   (data %>%
-    filter(date == max(date)) %>%
-    group_by(region) %>%
-    arrange(-cases) %>%
-    head(12)
-  )$region}
+     filter(date == max(date)) %>%
+     group_by(region) %>%
+     arrange(-cases) %>%
+     head(12))$region
+}
 
 filter_regions = function(data, regions) {
   filter(data,
          region %in% regions)
-  }
+}
 
 trend_calc = function(data) {
   n_days_ago = tail(sort(unique(data$date)), 2)[1]
@@ -234,25 +239,28 @@ trend_calc = function(data) {
     group_by(region) %>%
     arrange(date) %>%
     summarize(
-      log2.growth.rate = (lm(formula = log2cases ~ date)$coeff[2]),
+      model1 = list(lm(formula = log2cases ~ date)),
       log2.latest.cases = last(log2cases),
       latest.total.cases = last(total.cases),
       population = last(population)
     ) %>%
     mutate(
+      log2.growth.rate = sapply(model1, function(x)
+        x$coeff[2]),
       growth.rate = 2 ** log2.growth.rate,
       days.to.double = decimal_trunc(1 / log2.growth.rate)
     ) %>%
-    mutate(days.to.1M = {
-      d = (log2(10E6) - log2.latest.cases) / log2.growth.rate
-      ifelse(d > 0, trunc(d), Inf)
-    }) %>%
+    mutate(in.15.days = sapply(model1, function(x)
+      trunc(2 ** predict(
+        x, newdata = data.frame(date = last_day + 15)
+      )))) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
       latest.cases = trunc(2 ** log2.latest.cases),
-     latest.cases.per.hundred.thousand = decimal_trunc(latest.cases * 1E5 / population)
+      latest.cases.per.hundred.thousand =
+        decimal_trunc(latest.cases * 1E5 / population)
     ) %>%
-    dplyr::select(-starts_with("log2"),-growth.rate, -population)
+    dplyr::select(-starts_with("model"), -starts_with("log2"), -growth.rate, -population)
 }
 
 
@@ -298,7 +306,8 @@ server <- function(input, output, session) {
       "regions",
       "Region (biggest current outbreaks shown, click for more)",
       choices = all_regions,
-      selected = if (is.null(input$regions) || !all(input$regions%in% all_regions)) {
+      selected = if (is.null(input$regions) ||
+                     !all(input$regions %in% all_regions)) {
         high_cases_regions(data)
       } else {
         input$regions
