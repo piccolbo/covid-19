@@ -72,7 +72,7 @@ ui <- fluidPage(# Application title
       ),
       radioButtons(
         "density",
-        "Convert to density(cases per 1M people)",
+        "Convert to prevalence (cases per 100K people)",
         choices = c("no", "yes"),
         inline = TRUE
       ),
