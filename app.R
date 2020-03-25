@@ -18,22 +18,27 @@ library(DT)
 library(wbstats)
 
 
-
-corona_wide = bind_rows(
-  .id = "type",
-  confirmed = readr::read_csv(
-    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
-  ),
-  deaths = readr::read_csv(
-    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
-  ),
-  recovered = readr::read_csv(
-    "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv"
-  )
-)
+corona = readr::read_csv("https://coronadatascraper.com/timeseries-tidy.csv",
+                         guess_max = 100000)
 
 
-all_dates = purrr::discard(lubridate::mdy(colnames(corona_wide)), .p = is.na)
+is_city = function(x) {
+  !is.na(x$city)
+}
+
+is_county = function(x) {
+  !is_city(x) & !is.na(x$county)
+}
+
+is_state = function(x) {
+  !is_city(x) & !is_county(x) & !is.na(x$state)
+}
+
+is_country = function(x) {
+  !is_city(x) & !is_county(x) & !is_state(x) & !is.na(x$country)
+}
+
+all_dates = unique(corona$date)
 
 options(DT.fillContainer = FALSE)
 options(DT.autoHideNavigation = FALSE)
@@ -59,8 +64,8 @@ ui <- fluidPage(# Application title
       radioButtons(
         "type",
         "Type",
-        choices = unique(corona_wide$type),
-        selected = "confirmed",
+        choices = unique(corona$type),
+        selected = "cases",
         inline = TRUE
       ),
       radioButtons(
@@ -91,7 +96,7 @@ ui <- fluidPage(# Application title
       # tabPanel("Data", dataTableOutput("data")),
       tabPanel(
         "Methods",
-        "Data from https://github.com/CSSEGISandData/COVID-19  Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html after a log transform (because the smoother is locally linear, and in log scale these trends appear close to linear) on the cumulative counts. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale (on the daily count, which I may reconsider). \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. \"Days to 1M\" likewise (per day). These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. I do have a background in science, but this has been hastly produced and not peer-reviewed. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. Major caveat is that confirmed cases per day may be capped by detection capacity for large outbreaks or in countries run by incompetent people and by censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
+        "Data from coronascraper Smoothed with https://stat.ethz.ch/R-manual/R-devel/library/stats/html/supsmu.html after a log transform (because the smoother is locally linear, and in log scale these trends appear close to linear) on the cumulative counts. Trends are computed with a linear model applied to the last 5 days of smoothed data in log scale (on the daily count, which I may reconsider). \"Days to double\" is a rough estimate of how many days it takes for cases to double, negative numbers corresponding to decrease or halving time. \"Days to 1M\" likewise (per day). These choices are reasonable given a visual inspection of the data and the little I know about epidemiology but have not been validated and assume unchanged policies and attitudes in the affected countries, which is hopefully the wrong assumption, plus negligible levels of immunity in the population, which is correct but is bound to change in the near future. I do have a background in science, but this has been hastly produced and not peer-reviewed. This analysis is meant to support the view that we are in an exponential phase of disesase spread in most countries, that is increase from one day to the next as a percentage is roughly constant. No health care system, let alone a system for tracking and isolating cases, can work more than a few days when cases double every 2 or 3 days as we are seeing in several countries as of early March. Only mobilizing a large fraction of the population can work (self-quarantine, social distancing, remote work, canceling gatherings, school closings, travel restrictions etc.). Countries that show a declining number of new cases (for example China, Hong Kong, South Korea as of early March) have applied these population-wide measures. Major caveat is that confirmed cases per day may be capped by detection capacity for large outbreaks or in countries run by incompetent people and by censorship. In that case check the trends on number of deaths, which are harder to conceal -- but causes of death may be attributed incorrectly. Code: https://github.com/piccolbo/covid-19 Feedback: covid19@piccolboni.info"
       )
     ))
   ))
@@ -104,9 +109,11 @@ diff_smooth = function(x, smoothing) {
   bottom = .1
   x = pmax(bottom, x)
   if (smoothing) {
-    pmax(bottom, c(bottom, diff(exp(
-      supsmu(1:length(x), log(x))$y
-    ))))
+    pmax(bottom,
+         c(bottom,
+           diff(exp(
+             x = supsmu(1:length(x), log(x))$y
+           ))))
   }
   else
     c(bottom, diff(x))
@@ -115,35 +122,6 @@ diff_smooth = function(x, smoothing) {
 spy = function(x, f) {
   print(do.call(paste, as.list(f(x))))
   x
-}
-
-country_translate = function(x) {
-  name_translation = c(
-    "US" = "United States",
-    "Slovakia" = "Slovak Republic",
-    "Russia" = "Russian Federation",
-    "Korea, South" = "Korea, Rep.",
-    "Iran" = "Iran, Islamic Rep.",
-    "Egypt" = "Egypt, Arab Rep.",
-    "Czechia" = "Czech Republic",
-    "Brunei" = "Brunei Darussalam"
-  )
-  trn = names(name_translation)
-  names(trn) = name_translation
-  if (is.na(trn[x]))
-    x
-  else
-    trn[x]
-}
-
-county_state_map = function(x) {
-  v = state.name
-  names(v) = state.abb
-  y = v[strsplit(x, split = ", ", fixed = TRUE)[[1]][2]]
-  if (is.na(y))
-    x
-  else
-    y
 }
 
 state_abb_map = function(x) {
@@ -156,72 +134,42 @@ state_abb_map = function(x) {
     y
 }
 
-process_data = function(options, smoothing = NULL) {
-  tryCatch (
-    unsafe_process_data(options, smoothing),
-    error = function(e) {
-      corona_wide = select(corona_wide, -NCOL(corona_wide))
-    }
-  )
-}
 
-unsafe_process_data = function(options, smoothing) {
+process_data = function(options, smoothing = NULL) {
   smoothing = (if (is.null(smoothing))
     options$smoothing == "yes"
     else
       smoothing)
   world = options$world_or_US == "Countries"
-  data = corona_wide %>%
-    filter(type  == options$type) %>%
-    pivot_longer(cols = ends_with("/20")) %>%
-    mutate(date = lubridate::mdy(name)) %>% select(-name) %>%
-    mutate(cases = replace_na(value, 0))
+  data = corona %>%
+    filter(type  == options$type)
 
 
   data =  if (world) {
-    rename(data, region = "Country/Region")
+    filter(data, is_country(data)) %>%
+      rename(region = "country")
+
   }
   else{
-    rename(data, region = "Province/State") %>%
-      filter(`Country/Region` == "US") %>%
-      mutate(region = sapply(region, county_state_map))
+    filter(data, is_state(data) & country == "USA") %>%
+      rename(region = "state")
   }
 
 
   data =
-    group_by(data, region, date) %>%
-    summarise(cases = sum(cases)) %>%
+    group_by(data, region) %>%
     arrange(date) %>%
-    mutate(total.cases = cases, cases = diff_smooth(cases, smoothing)) %>%
-    mutate(log2cases = log2(ifelse(cases > 0, cases, 0.1)))
+    mutate(total.value = value, value = diff_smooth(value, smoothing)) %>%
+    mutate(log2value = log2(ifelse(value > 0, value, 0.1)))
 
-
-  if (world) {
-    pop_data = wb(indicator = "SP.POP.TOTL", mrv = 1) %>%
-      mutate(country =
-               unlist(purrr::map(.x = country, .f = country_translate)))
-    data = left_join(data,
-                     pop_data %>% select(country, population = value),
-                     by = c("region" = "country"))
-  }
-  else{
-    state_pop = jsonlite::fromJSON(file("us_state_pops.json"))
-    state_pop =
-      tibble(name = sapply(names(state_pop), state_abb_map),
-             population = unlist(state_pop))
-    data = left_join(data,
-                     state_pop,
-                     by = c("region" = "name"))
-  }
   data
 }
-
 
 high_cases_regions = function(data) {
   (data %>%
      filter(date == max(date)) %>%
      group_by(region) %>%
-     arrange(-cases) %>%
+     arrange(-value) %>%
      head(12))$region
 }
 
@@ -231,7 +179,7 @@ filter_regions = function(data, regions) {
 }
 
 trend_calc = function(data) {
-  n_days_ago = tail(sort(unique(data$date)), 2)[1]
+  n_days_ago = tail(sort(unique(data$date)), 3)[1]
   last_day = max(data$date)
 
   data %>%
@@ -239,16 +187,19 @@ trend_calc = function(data) {
     group_by(region) %>%
     arrange(date) %>%
     summarize(
-      model1 = list(lm(formula = log2cases ~ date)),
-      log2.latest.cases = last(log2cases),
-      latest.total.cases = last(total.cases),
+      model1 = list(lm(formula = log2value ~ date)),
+      # model2 = list(lm(formula = log2value ~ poly(date, 2))),
+      log2.latest.value = last(log2value),
+      latest.total.value = last(total.value),
       population = last(population)
     ) %>%
     mutate(
       log2.growth.rate = sapply(model1, function(x)
         x$coeff[2]),
       growth.rate = 2 ** log2.growth.rate,
-      days.to.double = decimal_trunc(1 / log2.growth.rate)
+      days.to.double = decimal_trunc(1 / log2.growth.rate)#,
+      #concavity = sapply(model2, function(x)        x$coeff[3])
+      # pval = sapply(model2, function(x) (x %>% summary %>% coefficients)[3,4])
     ) %>%
     mutate(in.15.days = sapply(model1, function(x)
       trunc(2 ** predict(
@@ -256,11 +207,11 @@ trend_calc = function(data) {
       )))) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
-      latest.cases = trunc(2 ** log2.latest.cases),
-      latest.cases.per.hundred.thousand =
-        decimal_trunc(latest.cases * 1E5 / population)
+      latest.value = trunc(2 ** log2.latest.value),
+      latest.value.per.hundred.thousand =
+        decimal_trunc(latest.value * 1E5 / population)
     ) %>%
-    dplyr::select(-starts_with("model"), -starts_with("log2"), -growth.rate, -population)
+    dplyr::select(-starts_with("model"),-starts_with("log2"),-growth.rate,-population)
 }
 
 
@@ -275,7 +226,7 @@ server <- function(input, output, session) {
       data = data,
       mapping = aes(
         x = date,
-        y = cases / (if (input$density == "yes")
+        y = value / (if (input$density == "yes")
           population / 1E5
           else
             1),
