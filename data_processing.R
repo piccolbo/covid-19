@@ -182,27 +182,45 @@ high_cases_regions = function(data) {
   )$region
 }
 
+belong_to_level = function(location, data, level) {
+  all(location %in% data[[level]])
 }
+
 process_data = function(data,
                         level = c("city", "county", "state", "country"),
                         type = c(all_types),
-                        top_region = NULL,
-                        regions = NULL,
-                        date_range = NULL) {
+                        top_region,
+                        regions,
+                        date_range) {
   level = match.arg(level)
   type = match.arg(type)
-  data = expand_country_names(data)
-  message(paste(c(level, type, top_region, regions)), collapse = "|")
-  filter_data(
+  message(paste(
+    c(level, type, top_region, regions),
+    sep = " :: ",
+    collapse = " : "
+  ))
+  if (level == "country") {
+    top_region = NULL
+  }
+  else {
+    if (!belong_to_level(top_region, data, one_level_up(level))) {
+      top_region = NULL
+    }
+  }
+  if (!belong_to_level(regions, data, level)) {
+    regions = NULL
+  }
+
+  data = filter_data(
     data,
     level = level,
     type = type,
     top_region = top_region,
     regions = regions,
     date_range = date_range
-  ) %>%
-    set_region(level = level) %>%
-    more_columns()
+  ) %>%  set_region(level = level)
+  data = more_columns(data)
+  data
 }
 
 trend_calc = function(data) {
