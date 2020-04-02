@@ -33,7 +33,6 @@ corona = readr::read_csv(
     population = col_double(),
     lat = col_double(),
     long = col_double(),
-    url = col_character(),
     aggregate = col_character(),
     tz = col_character(),
     date = col_date(format = ""),

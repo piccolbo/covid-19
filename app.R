@@ -9,6 +9,7 @@
 
 
 source("data_processing.R")
+source("plots.R")
 library(ggplot2)
 library(directlabels)
 library(DT)
@@ -49,22 +50,25 @@ ui <- fluidPage(# Application title
         inline = TRUE
       ),
       checkboxInput(
-        "density",
+        "prevalence",
         "Convert to prevalence (cases per 100K people)",
         value = TRUE
       ),
       uiOutput("top_region_choice"),
       uiOutput("region_selector"),
-      checkboxInput(
-        "smoothing",
-        "Use smoothing (simpler graphs)",
-        value = TRUE
-      )
+      checkboxInput("smoothing",
+                    "Use smoothing (simpler graphs)",
+                    value = TRUE)
     ),
 
     mainPanel(
-      tabsetPanel(id = "mainPanel-tabsetPanel",
-        tabPanel("Time series", plotOutput("timeseries", height = "800px")),
+      tabsetPanel(
+        id = "mainPanel-tabsetPanel",
+        tabPanel(
+          "Time series",
+          plotOutput("timeseries", height = "800px")#,
+          # downloadButton("download_timeseries")
+        ),
         tabPanel("Growth vs Size", plotOutput("growthvssize", height = "800px")),
         tabPanel("Stats and projections", dataTableOutput("stats")),
         tabPanel("Data", value = "data", dataTableOutput("data")),
@@ -85,12 +89,27 @@ safe_select_regions = function(regions, data) {
   }
 }
 
+
+belongs_to_level = function(region, data, level) {
+  if (is.null(region)) {
+    NULL
+  }
+  else{
+    if (region %in% unique(data[[level]]))
+      region
+    else
+      NULL
+  }
+}
+
 server <- function(input, output, session) {
   observeEvent(session$clientData$url_hostname, {
     message(session$clientData$url_hostname)
     if (session$clientData$url_hostname != "127.0.0.1") {
       message("hide tab")
-      hideTab(inputId = "mainPanel-tabsetPanel", target = "data")}})
+      hideTab(inputId = "mainPanel-tabsetPanel", target = "data")
+    }
+  })
 
 
   output$top_region_choice = renderUI({
@@ -99,6 +118,8 @@ server <- function(input, output, session) {
       data = process_data(
         data = corona,
         level = one_level_up(input$level),
+        top_region = NULL,
+        regions = NULL,
         type = input$type,
         date_range = input$date_range
       )
@@ -118,7 +139,8 @@ server <- function(input, output, session) {
       data = corona,
       level = input$level,
       type = input$type,
-      top_region = input$top_region,
+      top_region = belongs_to_level(input$top_region, corona, one_level_up(input$level)),
+      regions = NULL,
       date_range = input$date_range
     )
     all_regions = sort(unique(data$region))
@@ -126,10 +148,11 @@ server <- function(input, output, session) {
       "regions",
       "Regions to show data from (biggest current outbreaks shown, click for more)",
       choices = all_regions,
-      selected = safe_select_regions(input$regions, data),
+      selected = safe_select_regions(sort(input$regions), data),
       multiple = TRUE
     )
   })
+
 
   output$timeseries = renderCachedPlot({
     message("output$timeseries")
@@ -142,39 +165,53 @@ server <- function(input, output, session) {
         regions = input$regions,
         date_range = input$date_range
       )
-      ggplot(
-        data = data,
-        mapping = aes(
-          x = date,
-          y = (if (input$smoothing)
-            smoothed.increase
-            else
-              increase) / (if (input$density)
-                population / 1E5
-                else
-                  1),
-          label = region,
-          color = region
+      print(
+        plot_timeseries(
+          data,
+          type = input$type,
+          prevalence = input$prevalence,
+          smoothing = input$smoothing
         )
-      ) +
-        geom_line() +
-        geom_dl(method = "angled.boxes") +
-        scale_y_log10(labels = identity) +
-        ylab(paste("New daily", input$type, (if (input$density)
-          "per hundred thousands"
-          else
-            ""))) +
-        theme(legend.position = "none")
+      )
     }
   },
   cacheKeyExpr = list(
     input$regions,
     input$smoothing,
     input$date_range,
-    input$density,
+    input$prevalence,
     input$type,
     strsplit(date(), " ")[[1]][1:3]
   ))
+  output$download_timeseries = downloadHandler(
+    filename = paste("timeseries", trunc(runif(1) * 1000), ".png"),
+    content = function(file) {
+      device = function(..., width, height) {
+        grDevices::png(...,
+                       width = width,
+                       height = height)
+      }
+      data = process_data(
+        data = corona,
+        level = input$level,
+        type = input$type,
+        top_region = input$top_region,
+        regions = input$regions,
+        date_range = input$date_range
+      )
+      message(class(data))
+      ggsave(
+        file,
+        plot = plot_timeseries(
+          data = data,
+          type = input$type,
+          smoothing = input$smoothing,
+          prevalence = input$prevalence
+        ),
+        device = device
+      )
+    }
+  )
   output$growthvssize = renderCachedPlot({
     message("output$growthvssize")
     data = process_data(
@@ -182,47 +219,19 @@ server <- function(input, output, session) {
       level = input$level,
       type = input$type,
       top_region = input$top_region,
-      regions = input$regions#,
-      # date_range = input$date_range
+      regions = input$regions,
+      date_range = NULL
     )
-      0.03
-    min.cumu.value = if (input$density)
-    else
-      100
-    plot = ggplot(
-      data = data,
-      mapping = aes(
-        x = smoothed.cumulative.value / (if (input$density)
-          population / 1E5
-          else
-            1),
-        y = 100 * decimal_trunc(
-          ifelse(
-            smoothed.cumulative.value > min.cumu.value,
-            smoothed.increase / smoothed.cumulative.value,
-            NA
-          )
-        ),
-        label = region,
-        color = region
-      )
-    ) +
-      geom_line() +
-      geom_dl(method = "angled.boxes") +
-      scale_x_log10(labels = identity, limits = c(min.cumu.value, NA)) +
-      scale_y_log10(labels = identity) +
-      xlab(paste(input$type, (if (input$density)
-        "per hundred thousands"
-        else
-          ""))) +
-      ylab("growth rate") +
-      theme(legend.position = "none")
-    plot
+    print(plot_growthvssize(
+      data,
+      type = input$type,
+      prevalence = input$prevalence
+    ))
   },
   cacheKeyExpr = list(
     input$regions,
     input$smoothing,
-    input$density,
+    input$prevalence,
     input$type,
     strsplit(date(), " ")[[1]][1:3]
   ))
@@ -234,6 +243,7 @@ server <- function(input, output, session) {
         level = input$level,
         type = input$type,
         top_region = input$top_region,
+        regions = NULL,
         date_range = input$date_range
       )
     )
