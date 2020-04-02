@@ -48,19 +48,17 @@ ui <- fluidPage(# Application title
         selected = "country",
         inline = TRUE
       ),
-      radioButtons(
+      checkboxInput(
         "density",
         "Convert to prevalence (cases per 100K people)",
-        choices = c("no", "yes"),
-        inline = TRUE
+        value = TRUE
       ),
       uiOutput("top_region_choice"),
       uiOutput("region_selector"),
-      radioButtons(
+      checkboxInput(
         "smoothing",
         "Use smoothing (simpler graphs)",
-        choices = c("yes", "no"),
-        inline = TRUE
+        value = TRUE
       )
     ),
 
@@ -145,10 +143,10 @@ server <- function(input, output, session) {
         data = data,
         mapping = aes(
           x = date,
-          y = (if (input$smoothing == "yes")
+          y = (if (input$smoothing)
             smoothed.increase
             else
-              increase) / (if (input$density == "yes")
+              increase) / (if (input$density)
                 population / 1E5
                 else
                   1),
@@ -159,7 +157,7 @@ server <- function(input, output, session) {
         geom_line() +
         geom_dl(method = "angled.boxes") +
         scale_y_log10(labels = identity) +
-        ylab(paste("New daily", input$type, (if (input$density == "yes")
+        ylab(paste("New daily", input$type, (if (input$density)
           "per hundred thousands"
           else
             ""))) +
@@ -183,14 +181,14 @@ server <- function(input, output, session) {
       regions = input$regions#,
       # date_range = input$date_range
     )
-    min.cumu.value = if (input$density == "yes")
       0.03
+    min.cumu.value = if (input$density)
     else
       100
     plot = ggplot(
       data = data,
       mapping = aes(
-        x = cumulative.value / (if (input$density == "yes")
+        x = smoothed.cumulative.value / (if (input$density)
           population / 1E5
           else
             1),
@@ -209,7 +207,7 @@ server <- function(input, output, session) {
       geom_dl(method = "angled.boxes") +
       scale_x_log10(labels = identity, limits = c(min.cumu.value, NA)) +
       scale_y_log10(labels = identity) +
-      xlab(paste(input$type, (if (input$density == "yes")
+      xlab(paste(input$type, (if (input$density)
         "per hundred thousands"
         else
           ""))) +
