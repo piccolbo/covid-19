@@ -182,8 +182,6 @@ high_cases_regions = function(data) {
   )$region
 }
 
-arg_consistency =function(data, level, top_region, regions){
-
 }
 process_data = function(data,
                         level = c("city", "county", "state", "country"),
