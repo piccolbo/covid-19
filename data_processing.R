@@ -256,10 +256,5 @@ trend_calc = function(data) {
       latest.value.per.hundred.thousand =
         decimal_trunc(latest.value * 1E5 / population)
     ) %>%
-    dplyr::select(-starts_with("model"),
-                  -starts_with("log2"),
-                  -growth.rate,
-                  -population)
+    dplyr::select(-starts_with("model"),-starts_with("log2"),-growth.rate,-population)
 }
-
-
