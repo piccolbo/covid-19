@@ -94,6 +94,7 @@ server <- function(input, output, session) {
 
 
   output$top_region_choice = renderUI({
+    message("output$top_region_choice")
     if (input$level != "country") {
       data = process_data(
         data = corona,
@@ -112,6 +113,7 @@ server <- function(input, output, session) {
     }
   })
   output$region_selector = renderUI({
+    message("output$region_selector")
     data = process_data(
       data = corona,
       level = input$level,
@@ -130,13 +132,7 @@ server <- function(input, output, session) {
   })
 
   output$timeseries = renderCachedPlot({
-    message(paste(
-      c(input$level,
-        input$type,
-        input$top_region,
-        input$regions),
-      collapse = " | "
-    ))
+    message("output$timeseries")
     if (!is.null(input$regions)) {
       data = process_data(
         data = corona,
@@ -180,6 +176,7 @@ server <- function(input, output, session) {
     strsplit(date(), " ")[[1]][1:3]
   ))
   output$growthvssize = renderCachedPlot({
+    message("output$growthvssize")
     data = process_data(
       data = corona,
       level = input$level,
@@ -230,6 +227,7 @@ server <- function(input, output, session) {
     strsplit(date(), " ")[[1]][1:3]
   ))
   output$stats = renderDataTable({
+    message("output$stats")
     trend_calc(
       data = process_data(
         data = corona,
@@ -241,6 +239,7 @@ server <- function(input, output, session) {
     )
   }, options = list(order = list(list(5, 'desc'))))
   output$data = renderDataTable({
+    message("output$data")
     data = process_data(
       data = corona,
       level = input$level,
