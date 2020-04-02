@@ -1,6 +1,28 @@
 library(readr)
 library(dplyr)
 
+#data read and one-time processing
+
+df2named_vector = function(keys, values, data = NULL) {
+  if (!is.null(data)) {
+    keys = data[[keys]]
+    values = data[[values]]
+  }
+  v = values
+  names(v) = keys
+  v
+}
+
+three_letter2country = function(x) {
+  map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
+  unlist(map[x])
+}
+
+expand_country_names = function(data) {
+  mutate(data, country = three_letter2country(country))
+}
+
+
 corona = readr::read_csv(
   "https://coronadatascraper.com/timeseries-tidy.csv",
   col_types = cols(
@@ -18,7 +40,9 @@ corona = readr::read_csv(
     type = col_character(),
     value = col_double()
   )
-)
+) %>%   expand_country_names
+
+
 
 # filtering
 
@@ -85,24 +109,7 @@ filter_data = function(data,
 }
 
 
-df2named_vector = function(keys, values, data = NULL) {
-  if (!is.null(data)) {
-    keys = data[[keys]]
-    values = data[[values]]
-  }
-  v = values
-  names(v) = keys
-  v
-}
-
-three_letter2country = function(x) {
-  map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
-  unlist(map[x])
-}
-
-expand_country_names = function(data) {
-  mutate(data, country = three_letter2country(country))
-}
+#stats
 
 set_region = function(data,
                       level = c("city", "county", "state", "country")) {
