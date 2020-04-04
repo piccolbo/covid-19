@@ -41,7 +41,10 @@ corona = readr::read_csv(
     type = col_character(),
     value = col_double()
   )
-) %>%   expand_country_names
+) %>%
+  expand_country_names %>%
+  dplyr::select(city, county, state, country, population, date, type, value) %>%
+  group_by(city, county, state, country, type) %>% arrange(date) %>% mutate(value = monotonize(value)) %>% ungroup
 
 
 
