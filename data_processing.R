@@ -15,7 +15,7 @@ df2named_vector = function(keys, values, data = NULL) {
 
 three_letter2country = function(x) {
   map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
-  unlist(map[x])
+  unlist(ifelse(is.na(map[x]), x, map[x]))
 }
 
 expand_country_names = function(data) {
