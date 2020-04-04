@@ -67,8 +67,8 @@ is_country = function(x) {
 }
 
 all_dates = unique(corona$date)
-all_types = unique(corona$type)
-
+# all_types = unique(corona$type)
+all_types = c("cases", "deaths", "recovered", "tested")
 
 
 

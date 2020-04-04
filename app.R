@@ -20,7 +20,7 @@ options(DT.autoHideNavigation = FALSE)
 ui <- fluidPage(# Application title
   titlePanel(
     paste(
-      "Daily new cases (deaths, recovered) per country or state,  updated as of",
+      "Daily new cases (deaths, recovered, tested) per country or state,  updated as of",
       as.character(max(all_dates))
     )
   ),
@@ -38,7 +38,7 @@ ui <- fluidPage(# Application title
       radioButtons(
         "type",
         "Type",
-        choices = unique(corona$type),
+        choices = all_types,
         selected = "cases",
         inline = TRUE
       ),
