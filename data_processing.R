@@ -22,6 +22,8 @@ expand_country_names = function(data) {
   mutate(data, country = three_letter2country(country))
 }
 
+monotonize = function(x) c(x[1], pmax(head(x, -1), tail(x, -1)))
+
 
 corona = readr::read_csv(
   "https://coronadatascraper.com/timeseries-tidy.csv",
