@@ -57,6 +57,8 @@ plot_growthvssize = function(data, type, prevalence) {
         NA
       )
     ), shape = "diamond", size = 4) +
+    scale_x_log10(labels = decimal_trunc) +
+    scale_y_log10(labels = decimal_trunc) +
       else
         "")),
       y = "Daily new as percentage of cumulative",
