@@ -257,9 +257,9 @@ filter_data2 = function(data,
 filter_data = function(data,
                        level = all_levels,
                        type = c(all_types),
-                       top_region = NULL,
-                       regions = NULL,
-                       date_range = NULL) {
+                       top_region,
+                       regions,
+                       date_range) {
   level = match.arg(level)
   top_level = one_level_up(level)
   typ = match.arg(type)
