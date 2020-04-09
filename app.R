@@ -54,8 +54,14 @@ ui <- fluidPage(# Application title
         selected = "country",
         inline = TRUE
       ),
-      uiOutput("top_region_choice"),
-      uiOutput("region_selector"),
+      selectizeInput("top_region",
+                     "",
+                     choices = NULL,
+                     multiple = FALSE),
+      selectizeInput("regions",
+                     "",
+                     choices =  NULL,
+                     multiple = TRUE),
       checkboxInput("smoothing",
                     "Use smoothing (simpler graphs)",
                     value = TRUE)
