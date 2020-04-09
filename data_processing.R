@@ -409,13 +409,13 @@ more_columns = function(data, prevalence) {
     filter(date > min(date))
 }
 
-high_cases_regions = function(data) {
+high_cases_regions = function(data, n) {
   (
     data %>%
       filter(date == max(date)) %>%
       group_by(region) %>%
       arrange(-smoothed.increase) %>%
-      head(12)
+      head(n)
   )$region
 }
 
