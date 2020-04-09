@@ -50,6 +50,13 @@ plot_growthvssize = function(data, type, prevalence) {
     geom_path() +
     geom_point() +
     geom_dl(method = "angled.boxes") +
+    geom_point(mapping = aes(
+      y = ifelse(
+        date == lockdate,
+        100 * smoothed.increase / smoothed.cumulative,
+        NA
+      )
+    ), shape = "diamond", size = 4) +
       else
         ""))) +
     ylab("growth rate") +
