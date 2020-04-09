@@ -37,7 +37,7 @@ ui <- fluidPage(# Application title
       ),
       radioButtons(
         "type",
-        "Type",
+        "Type (all numbers affected by varying definitions, testing capacity, all likely to be less than or even a fraction of reality; these biases are not even consistent over time)",
         choices = all_types,
         selected = "cases",
         inline = TRUE
