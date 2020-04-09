@@ -285,9 +285,9 @@ set_region = function(data,
   rename(data, region = level)
 }
 
-
-decimal_trunc = function(x)
-  trunc(x * 100) / 100
+decimal_trunc = function(x) {
+  as.numeric(format(x, digits = 2))
+}
 
 bottom = .1
 
