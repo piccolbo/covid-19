@@ -361,20 +361,32 @@ spy = function(x, f = identity) {
 }
 
 
-more_columns = function(data) {
-  group_by(data, region) %>%
+more_columns = function(data, prevalence) {
+  mutate(
+    data,
+    value = value / (if (prevalence)
+      population/1E5
+      else
+        1),
+    bottom = .1 / if (prevalence)
+      population
+    else
+      1
+  ) %>%
+    rename(cumulative = value) %>%
+    group_by(region) %>%
     arrange(date) %>%
-    rename(cumulative.value = value) %>%
-    mutate(smoothed.cumulative.value = logsmooth(cumulative.value)) %>%
+    mutate(smoothed.cumulative = logsmooth(cumulative, bottom)) %>%
     mutate(
-      increase = cdiff(cumulative.value),
-      smoothed.increase = cdiff(smoothed.cumulative.value)
+      increase = cdiff(cumulative, bottom),
+      smoothed.increase = cdiff(smoothed.cumulative, bottom),
+      ratio = smoothed.increase/smoothed.cumulative
     ) %>%
     mutate(
-      log2.cumulative.value = safe_log2(cumulative.value),
-      log2.smoothed.cumulative.value = safe_log2(smoothed.cumulative.value),
-      log2.increase = safe_log2(increase),
-      log2.smoothed.increase = safe_log2(smoothed.increase)
+      log2.cumulative = safe_log2(cumulative, bottom),
+      log2.smoothed.cumulative = safe_log2(smoothed.cumulative, bottom),
+      log2.increase = safe_log2(increase, bottom),
+      log2.smoothed.increase = safe_log2(smoothed.increase, bottom)
     ) %>%
     filter(date > min(date))
 }
