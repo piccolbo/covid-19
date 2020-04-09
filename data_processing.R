@@ -428,7 +428,8 @@ process_data = function(data,
                         type = c(all_types),
                         top_region,
                         regions,
-                        date_range) {
+                        date_range,
+                        prevalence) {
   level = match.arg(level)
   type = match.arg(type)
   message(paste(
@@ -445,7 +446,7 @@ process_data = function(data,
     regions = regions,
     date_range = date_range
   ) %>%  set_region(level = level)
-  data = more_columns(data)
+  data = more_columns(data, prevalence)
   data
 }
 
