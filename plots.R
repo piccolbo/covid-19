@@ -28,7 +28,9 @@ plot_timeseries = function(data, type, smoothing, prevalence) {
 
 plot_growthvssize = function(data, type, prevalence) {
   ggplot(
-    data = data,
+    data = ungroup(data) %>%
+      filter(smoothed.cumulative > quantile(smoothed.cumulative, probs = .5) & ratio >=0.01 & ratio < 0.99
+    ) %>% arrange(date),
     mapping = aes(
       x =  (
         if (prevalence)
