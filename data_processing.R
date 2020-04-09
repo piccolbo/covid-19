@@ -106,6 +106,55 @@ pop =
   group_by(city, county, state, country) %>%
   summarise(population = naggregate(population))
 
+
+lockdown =
+  c(
+    Alabama = "2020-04-04",
+    Alaska = "2020-03-28",
+    Arizona = "2020-03-31",
+    California = "2020-03-19",
+    Colorado = "2020-03-26",
+    Connecticut = "2020-03-23",
+    Delaware = "2020-03-24",
+    Florida = "2020-04-01",
+    Georgia = "2020-04-03",
+    Hawaii = "2020-03-25",
+    Illinois = "2020-03-21",
+    Indiana = "2020-03-25",
+    Kansas = "2020-03-19",
+    Kentucky = "2020-03-26",
+    Louisiana = "2020-03-23",
+    Maine = "2020-04-01",
+    Maryland = "2020-03-30",
+    Massachusetts = "2020-03-24",
+    Michigan = "2020-03-24",
+    Minnesota = "2020-03-27",
+    Mississippi = "2020-04-05",
+    Missouri = "2020-04-06",
+    Montana = "2020-03-10",
+    Nevada = "2020-03-21",
+    `New Hampshire` = "2020-03-27",
+    `New Jersey` = "2020-03-21",
+    `New Mexico` = "2020-03-24",
+    `New York` = "2020-03-22",
+    `North Carolina` = "2020-03-30",
+    Ohio = "2020-03-23",
+    Oregon = "2020-03-23",
+    Pennsylvania = "2020-04-01",
+    Tennessee = "2020-03-31",
+    Texas = "2020-04-02",
+    Vermont = "2020-03-25",
+    Washington = "2020-03-23",
+    `West Virgina` = "2020-03-24",
+    Wisconsin = "2020-03-24"
+  )
+
+nyt_us_counties = left_join(nyt_us_counties, pop)
+nyt_us_states = left_join(left_join(nyt_us_states, pop),
+                          data.frame(state = names(lockdown), lockdate = ymd(lockdown)))
+
+
+
 corona =
   bind_rows(atlas %>% filter(country != "United States" |
                                is.na(state)),
