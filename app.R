@@ -72,27 +72,6 @@ ui <- fluidPage(
     )
   ))
 
-safe_select_regions = function(regions, data) {
-  if (is.null(regions) ||
-      !all(regions %in% data$region)) {
-    high_cases_regions(data)
-  } else {
-    regions
-  }
-}
-
-
-belongs_to_level = function(region, data, level) {
-  if (is.null(region)) {
-    NULL
-  }
-  else{
-    if (region %in% unique(data[[level]]))
-      region
-    else
-      NULL
-  }
-}
 
 server <- function(input, output, session) {
   observeEvent(session$clientData$url_hostname, {
