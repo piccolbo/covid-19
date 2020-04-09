@@ -9,10 +9,7 @@ plot_timeseries = function(data, type, smoothing, prevalence) {
            y = (if (smoothing)
              smoothed.increase
              else
-               increase) / (if (prevalence)
-                 population / 1E5
-                 else
-                   1),
+               increase),
            label = region,
            color = region
          )) +
@@ -33,8 +30,9 @@ plot_growthvssize = function(data, type, prevalence) {
   ggplot(
     data = data,
     mapping = aes(
-      x = smoothed.cumulative.value / (if (prevalence)
-        population / 1E5
+      x =  (
+        if (prevalence)
+          1e-3 * smoothed.cumulative
         else
           1),
       y = 100 * decimal_trunc(smoothed.increase / smoothed.cumulative.value),
