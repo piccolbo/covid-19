@@ -339,9 +339,15 @@ fixed_length_smooth = function(x, y) {
   }
 }
 
-logsmooth = function(x) {
-  y = pmax(bottom, x)
-  pmax(bottom, exp(fixed_length_smooth(1:length(y), log(y))$y))
+logsmooth = function(x, bottom) {
+  if (all(is.na(x))) {
+    rep_len(NA_real_, length(x))
+  }
+  else {
+    y = pmax(bottom, x)
+    # pmax(bottom, fixed_length_smooth(1:length(y), y)$y)
+    pmax(bottom, exp(fixed_length_smooth(1:length(y), log(y))$y))
+  }
 }
 
 safe_log2 = function(x)
