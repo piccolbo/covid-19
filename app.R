@@ -7,7 +7,7 @@ library(DT)
 options(DT.fillContainer = FALSE)
 options(DT.autoHideNavigation = FALSE)
 
-ui <- fluidPage(# Application title
+ui <- fluidPage(
   titlePanel(
     paste(
       "Daily new cases (deaths, recovered, tested) per country or state,  updated as of",
