@@ -83,47 +83,91 @@ server <- function(input, output, session) {
   })
 
 
-  output$top_region_choice = renderUI({
-    message("output$top_region_choice")
-    if (input$level != "country") {
-      data = process_data(
-        data = corona,
-        level = one_level_up(input$level),
-        top_region = NULL,
-        regions = NULL,
-        type = input$type,
-        date_range = input$date_range
-      )
-      all_regions = sort(unique(data$region))
-      selectizeInput(
-        "top_region",
-        "Focus on this specific region",
-        choices = all_regions,
-        selected = safe_select_regions(input$region, data)[1],
-        multiple = FALSE
-      )
+  current_top_region = reactive({
+    if (input$level == "country")
+      NULL
+    else {
+      top_regions = has_subregions[[one_level_up(input$level)]]
+      if (input$top_region %in% top_regions) {
+        input$top_region
+      }
+      else
+        "United States"
     }
   })
-  output$region_selector = renderUI({
-    message("output$region_selector")
+
+  current_regions = reactive({
+    rr = regions_range()
+    rr6 = head(rr, 6)
+    if (is.null(input$regions)) {
+      rr6
+    }
+    else {
+      regions = intersect(input$regions, rr)
+      if (length(regions) > 0) {
+        input$regions
+      }
+      else
+        rr6
+    }
+  })
+
+
+  observeEvent(input$level,
+               {
+                 if (input$level == "country") {
+                   NULL
+                 }
+                 else{
+                   choices = has_subregions[[one_level_up(input$level)]]
+                   selected = high_cases_regions(
+                     data = process_data(
+                       data = corona,
+                       level = one_level_up(input$level),
+                       type = input$type,
+                       top_region = NULL,
+                       regions = NULL,
+                       date_range = NULL,
+                       prevalence = input$prevalence
+                     ),
+                     1
+                   )
+                   updateSelectizeInput(
+                     session = session,
+                     inputId = "top_region",
+                     label = "Focus on this specific region",
+                     choices =  choices,
+                     selected = selected,
+                     server = TRUE
+                   )
+                 }
+               })
+
+  observeEvent({
+    input$level
+    input$top_region
+  },
+  {
     data = process_data(
       data = corona,
       level = input$level,
       type = input$type,
-      top_region = belongs_to_level(input$top_region, corona, one_level_up(input$level)),
+      top_region = current_top_region(),
       regions = NULL,
-      date_range = input$date_range
+      date_range = NULL,
+      prevalence = input$prevalence
     )
-    all_regions = sort(unique(data$region))
-    selectizeInput(
-      "regions",
-      "Regions to show data from (biggest current outbreaks shown, click for more)",
-      choices = all_regions,
-      selected = safe_select_regions(sort(input$regions), data),
-      multiple = TRUE
+    choices = sort(unique(data[[input$level]]))
+    selected = high_cases_regions(data = data, 12)
+    updateSelectizeInput(
+      session = session,
+      inputId = "regions",
+      label = "Regions to show data from (biggest current outbreaks shown, click for more)",
+      choices = choices,
+      selected = selected,
+      server = TRUE
     )
   })
-
 
   output$timeseries = renderCachedPlot({
     message("output$timeseries")
@@ -134,7 +178,8 @@ server <- function(input, output, session) {
         type = input$type,
         top_region = input$top_region,
         regions = input$regions,
-        date_range = input$date_range
+        date_range = input$date_range,
+        input$prevalence
       )
       print(
         plot_timeseries(
@@ -168,7 +213,8 @@ server <- function(input, output, session) {
         type = input$type,
         top_region = input$top_region,
         regions = input$regions,
-        date_range = input$date_range
+        date_range = input$date_range,
+        input$prevalence
       )
       message(class(data))
       ggsave(
@@ -191,7 +237,8 @@ server <- function(input, output, session) {
       type = input$type,
       top_region = input$top_region,
       regions = input$regions,
-      date_range = NULL
+      date_range = NULL,
+      input$prevalence
     )
     print(plot_growthvssize(
       data,
@@ -215,7 +262,8 @@ server <- function(input, output, session) {
         type = input$type,
         top_region = input$top_region,
         regions = NULL,
-        date_range = input$date_range
+        date_range = NULL,
+        input$prevalence
       )
     )
   }, options = list(order = list(list(5, 'desc'))))
@@ -227,7 +275,8 @@ server <- function(input, output, session) {
       type = input$type,
       top_region = input$top_region,
       regions = input$regions,
-      date_range = input$date_range
+      date_range = input$date_range,
+      input$prevalence
     )
   })
 }
