@@ -58,8 +58,8 @@ plot_growthvssize = function(data, type, prevalence) {
       )
     ), shape = "diamond", size = 4) +
       else
-        ""))) +
-    ylab("growth rate") +
-    theme(legend.position = "none")
+        "")),
+      y = "Daily new as percentage of cumulative",
+      caption = element_text("Horizontal lines represent exponential growth. Diagonal lines represent equal number of new cases per day.\n Each dot is one day. Diamond shapes are start dates of shelter-in-place order (US states only and incomplete).", margin = 0)) +
     theme_covid
 }
