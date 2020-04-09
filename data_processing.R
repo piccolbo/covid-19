@@ -350,8 +350,10 @@ logsmooth = function(x, bottom) {
   }
 }
 
-safe_log2 = function(x)
+safe_log2 = function(x, bottom)
+{
   log2(pmax(x, bottom))
+}
 
 spy = function(x, f) {
   print(do.call(paste, as.list(f(x))))
