@@ -36,8 +36,9 @@ plot_growthvssize = function(data, type, prevalence) {
         if (prevalence)
           1e-3 * smoothed.cumulative
         else
-          1),
-      y = 100 * decimal_trunc(smoothed.increase / smoothed.cumulative.value),
+          smoothed.cumulative
+      ),
+      y = 100 * smoothed.increase / smoothed.cumulative,
       label = region,
       color = region
     )
