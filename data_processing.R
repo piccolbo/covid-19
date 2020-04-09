@@ -1,5 +1,8 @@
 library(readr)
 library(dplyr)
+library(purrr)
+library(tidyr)
+library(lubridate)
 
 #data read and one-time processing
 
@@ -31,9 +34,9 @@ tf = tempfile(fileext = ".csv.zip")
 download.file(url = "https://coronadatascraper.com/timeseries-tidy.csv.zip", destfile = tf)
 
 
-corona = readr::read_csv(
-  "https://coronadatascraper.com/timeseries-tidy.csv",
-  col_types = cols(
+atlas = read_csv(
+    file = tf,
+    col_types = cols(
     city = col_character(),
     county = col_character(),
     state = col_character(),
@@ -48,9 +51,67 @@ corona = readr::read_csv(
     value = col_double()
   )
 ) %>%
-  expand_country_names %>%
-  dplyr::select(city, county, state, country, population, date, type, value) %>%
-  group_by(city, county, state, country, type) %>% arrange(date) %>% mutate(value = monotonize(value)) %>% ungroup
+  dplyr::select(city, county, state, country, population, date, type, value) %>% #just what we need
+  expand_country_names %>% # readable country names
+  filter (date != max(date) &
+            !grepl(pattern = ",", x = county)) %>% #kill funky last day and combo counties
+  tidyr::separate(col = "county", into = "county", sep = " County") %>% # remove useless County from County names
+  tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
+  group_by(city, county, state, country, type) %>% arrange(date) %>%
+  mutate(value = monotonize(value)) %>% ungroup #correct declining cumulative counts
+
+unlink(tf)
+
+# return a unique item dropping NAs or NA if it's the only one
+naggregate = function(x) {
+  ux = unique(discard(x, is.na))
+  if (length(ux) == 0)
+    NA
+  else
+    ux
+}
+
+nyt_us_states =
+  read_csv(
+    "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
+    guess_max = 1e6
+  ) %>%
+  mutate(city = NA_character_,
+         county = NA_character_,
+         country = "United States") %>%
+  select (-fips) %>%
+  pivot_longer(
+    cols = c("cases", "deaths"),
+    names_to = "type",
+    values_to = "value"
+  )
+
+nyt_us_counties =
+  read_csv(
+    "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv",
+    guess_max = 1e6
+  ) %>%
+  mutate(city = NA_character_, country = "United States") %>%
+  select (-fips) %>%
+  pivot_longer(
+    cols = c("cases", "deaths"),
+    names_to = "type",
+    values_to = "value"
+  )
+
+
+pop =
+  atlas %>%
+  filter(country == "United States") %>%
+  group_by(city, county, state, country) %>%
+  summarise(population = naggregate(population))
+
+corona =
+  bind_rows(atlas %>% filter(country != "United States" |
+                               is.na(state)),
+            nyt_us_counties,
+            nyt_us_states)
+
 
 
 
