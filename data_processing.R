@@ -289,11 +289,11 @@ decimal_trunc = function(x) {
   as.numeric(format(x, digits = 2))
 }
 
-bottom = .1
-
-cdiff = function(x) {
+cdiff = function(x, bottom) {
   #this is wrong
-  pmax(0, c(bottom, diff(x)))
+  stopifnot(length(unique(bottom)) == 1)
+  bottom = unique(bottom)
+  pmax(bottom, c(bottom, diff(x)))
 }
 
 safe_approx = function(x, y, newx) {
