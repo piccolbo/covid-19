@@ -355,7 +355,7 @@ safe_log2 = function(x, bottom)
   log2(pmax(x, bottom))
 }
 
-spy = function(x, f) {
+spy = function(x, f = identity) {
   print(do.call(paste, as.list(f(x))))
   x
 }
