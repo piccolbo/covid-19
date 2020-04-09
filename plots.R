@@ -44,6 +44,7 @@ plot_growthvssize = function(data, type, prevalence) {
     )
   ) +
     geom_path() +
+    geom_point() +
     geom_dl(method = "angled.boxes") +
     scale_x_log10(labels = identity,
                   limits =
