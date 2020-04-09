@@ -50,15 +50,6 @@ plot_growthvssize = function(data, type, prevalence) {
     geom_path() +
     geom_point() +
     geom_dl(method = "angled.boxes") +
-    scale_x_log10(labels = identity,
-                  limits =
-                    c(1 / (if (prevalence)
-                      max(data$population) / 1E5
-                      else
-                        1), NA)) +
-    scale_y_log10(labels = identity) +
-    xlab(paste(type, (if (prevalence)
-      "per hundred thousands"
       else
         ""))) +
     ylab("growth rate") +
