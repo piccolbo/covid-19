@@ -42,17 +42,17 @@ ui <- fluidPage(# Application title
         selected = "cases",
         inline = TRUE
       ),
+      checkboxInput(
+        "prevalence",
+        "Convert to prevalence (cases per 100K people)",
+        value = FALSE
+      ),
       radioButtons(
         "level",
         "Choose admin unit level to visualize (US terminology used for all countries)",
         choices = c("country", "state", "county"),
         selected = "country",
         inline = TRUE
-      ),
-      checkboxInput(
-        "prevalence",
-        "Convert to prevalence (cases per 100K people)",
-        value = TRUE
       ),
       uiOutput("top_region_choice"),
       uiOutput("region_selector"),
