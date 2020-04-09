@@ -70,11 +70,7 @@ ui <- fluidPage(# Application title
     mainPanel(
       tabsetPanel(
         id = "mainPanel-tabsetPanel",
-        tabPanel(
-          "Time series",
-          plotOutput("timeseries", height = "800px")#,
-          # downloadButton("download_timeseries")
-        ),
+        tabPanel("Time series", plotOutput("timeseries", height = "800px")),
         tabPanel("Growth vs Size", plotOutput("growthvssize", height = "800px")),
         tabPanel("Stats and projections", dataTableOutput("stats")),
         tabPanel("Data", value = "data", dataTableOutput("data")),
