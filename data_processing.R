@@ -480,14 +480,16 @@ trend_calc = function(data) {
       # pval = sapply(model2, function(x) (x %>% summary %>% coefficients)[3,4])
     ) %>%
     mutate(in.15.days = sapply(model1, function(x)
-      trunc(2 ** predict(
-        x, newdata = data.frame(date = last_day + 15)
-      )))) %>%
+      if (is.null(x))
+        NA_real_
+      else{
+        decimal_trunc( 2 ** predict(
+          x, newdata = data.frame(date = last_day + 15)
+        ))}
+      )) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
-      latest.value = trunc(2 ** log2.latest.value),
-      latest.value.per.hundred.thousand =
-        decimal_trunc(latest.value * 1E5 / population)
+      latest.increase = decimal_trunc(2 ** log2.latest.increase)
     ) %>%
     dplyr::select(-starts_with("model"),-starts_with("log2"),-growth.rate,-population)
 }
