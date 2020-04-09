@@ -10,7 +10,7 @@ options(DT.autoHideNavigation = FALSE)
 ui <- fluidPage(
   titlePanel(
     paste(
-      "Daily new cases (deaths, recovered, tested) per country or state,  updated as of",
+      "Visualizations of new cases (deaths, recovered, tested) per country or state,  updated as of",
       as.character(max(all_dates))
     )
   ),
