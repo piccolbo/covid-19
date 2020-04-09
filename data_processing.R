@@ -282,7 +282,8 @@ filter_data = function(data,
 set_region = function(data,
                       level = c("city", "county", "state", "country")) {
   level = match.arg(level)
-  rename(data, region = level)
+  data$region = data[[level]]
+  data
 }
 
 decimal_trunc = function(x) {
