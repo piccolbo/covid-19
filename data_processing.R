@@ -27,6 +27,8 @@ monotonize = function(x) {
 }
 
 
+tf = tempfile(fileext = ".csv.zip")
+download.file(url = "https://coronadatascraper.com/timeseries-tidy.csv.zip", destfile = tf)
 
 
 corona = readr::read_csv(
