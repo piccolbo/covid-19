@@ -1,3 +1,7 @@
+library(ggplot2)
+
+theme_covid = theme(legend.position = "none", text = element_text(size = 20))
+
 plot_timeseries = function(data, type, smoothing, prevalence) {
   ggplot(data = data,
          mapping = aes(
@@ -21,7 +25,7 @@ plot_timeseries = function(data, type, smoothing, prevalence) {
                  "per hundred thousands"
                 else
                   ""))) +
-    theme(legend.position = "none")
+    theme_covid
 }
 
 
@@ -53,4 +57,5 @@ plot_growthvssize = function(data, type, prevalence) {
         ""))) +
     ylab("growth rate") +
     theme(legend.position = "none")
+    theme_covid
 }
