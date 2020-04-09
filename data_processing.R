@@ -166,6 +166,7 @@ corona =
 
 # filtering
 
+
 is_city = function(x) {
   !is.na(x$city)
 }
@@ -182,6 +183,11 @@ is_country = function(x) {
   !is_city(x) & !is_county(x) & !is_state(x) & !is.na(x$country)
 }
 
+has_subregions = list(
+  country =  corona[is_state(corona),]$country %>% unique,
+  state = discard(corona[is_county(corona),]$state %>% unique, is.na),
+  county = discard(corona[is_city(corona),]$county %>% unique, is.na)
+)
 all_dates = unique(corona$date)
 # all_types = unique(corona$type)
 all_types = c("cases", "deaths", "recovered", "tested")
