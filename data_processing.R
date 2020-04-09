@@ -459,15 +459,21 @@ trend_calc = function(data) {
     group_by(region) %>%
     arrange(date) %>%
     summarize(
-      model1 = list(lm(formula = log2.smoothed.increase ~ date)),
+      model1 = if (all(is.na(log2.smoothed.increase)))
+        list(NULL)
+      else
+        list(lm(formula = log2.smoothed.increase ~ date)),
       # model2 = list(lm(formula = log2value ~ poly(date, 2))),
-      log2.latest.value = last(log2.smoothed.increase),
-      latest.cumulative.value = last(cumulative.value),
+      log2.latest.increase = last(log2.smoothed.increase),
+      latest.cumulative = decimal_trunc(last(cumulative)),
       population = last(population)
     ) %>%
+    mutate(log2.growth.rate = unlist(sapply(model1, function(x)
+      if (is.null(x))
+        NA_real_
+      else
+        x$coeff[2]))) %>%
     mutate(
-      log2.growth.rate = sapply(model1, function(x)
-        x$coeff[2]),
       growth.rate = 2 ** log2.growth.rate,
       doubling.time = decimal_trunc(1 / log2.growth.rate)#,
       #concavity = sapply(model2, function(x)        x$coeff[3])
