@@ -200,6 +200,54 @@ one_level_up = function(level) {
   all_levels[which(all_levels == level) + 1]
 }
 
+one_level_down = function(level) {
+  all_levels[which(all_levels == level) - 1]
+}
+
+filter_data2 = function(data,
+                        type,
+                        countries,
+                        states,
+                        counties,
+                        cities,
+                        date_range) {
+  bind_rows(
+    filter_data(
+      data,
+      level = "country",
+      type = type,
+      top_region = NULL,
+      regions = countries,
+      date_range = date_range
+    ),
+    filter_data(
+      data,
+      level = "state",
+      type = type,
+      top_region = NULL,
+      regions = states,
+      date_range = date_range
+    ),
+    filter_data(
+      data,
+      level = "county",
+      type = type,
+      top_region = NULL,
+      regions = counties,
+      date_range = date_range
+    ),
+    filter_data(
+      data,
+      level = "city",
+      type = type,
+      top_region = NULL,
+      regions = cities,
+      date_range = date_range
+    )
+  )
+}
+
+
 filter_data = function(data,
                        level = all_levels,
                        type = c(all_types),
