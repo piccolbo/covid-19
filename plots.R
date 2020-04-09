@@ -43,6 +43,10 @@ plot_growthvssize = function(data, type, prevalence) {
       color = region
     )
   ) +
+    # geom_text(mapping = aes(label = date)) +
+    geom_abline(intercept = (-30:30),
+                slope = -1,
+                color = "white") +
     geom_path() +
     geom_point() +
     geom_dl(method = "angled.boxes") +
