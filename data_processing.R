@@ -475,18 +475,8 @@ trend_calc = function(data) {
         x$coeff[2]))) %>%
     mutate(
       growth.rate = 2 ** log2.growth.rate,
-      doubling.time = decimal_trunc(1 / log2.growth.rate)#,
-      #concavity = sapply(model2, function(x)        x$coeff[3])
-      # pval = sapply(model2, function(x) (x %>% summary %>% coefficients)[3,4])
-    ) %>%
-    mutate(in.15.days = sapply(model1, function(x)
-      if (is.null(x))
-        NA_real_
-      else{
-        decimal_trunc( 2 ** predict(
-          x, newdata = data.frame(date = last_day + 15)
-        ))}
-      )) %>%
+      doubling.time = decimal_trunc(1 / log2.growth.rate)
+      ) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
       latest.increase = decimal_trunc(2 ** log2.latest.increase)
