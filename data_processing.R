@@ -463,7 +463,6 @@ trend_calc = function(data) {
         list(NULL)
       else
         list(lm(formula = log2.smoothed.increase ~ date)),
-      # model2 = list(lm(formula = log2value ~ poly(date, 2))),
       log2.latest.increase = last(log2.smoothed.increase),
       latest.cumulative = decimal_trunc(last(cumulative)),
       population = last(population)
