@@ -305,8 +305,8 @@ set_region = function(data,
 }
 
 decimal_trunc = function(x) {
-  as.numeric(format(x, digits = 2))
-}
+      round(x*100)/100
+  }
 
 cdiff = function(x, bottom) {
   #this is wrong
