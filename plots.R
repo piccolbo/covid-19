@@ -29,15 +29,15 @@ plot_timeseries = function(data, type, smoothing, prevalence) {
 plot_growthvssize = function(data, type, prevalence) {
   ggplot(
     data = ungroup(data) %>%
-      filter(smoothed.cumulative > quantile(smoothed.cumulative, probs = .5) & ratio >=0.01 & ratio < 0.99
-    ) %>% arrange(date),
+      filter(
+        smoothed.cumulative > quantile(smoothed.cumulative, probs = .5, na.rm = TRUE) &
+          ratio >= 0.01 & ratio < 0.99
+      ) %>% arrange(date),
     mapping = aes(
-      x =  (
-        if (prevalence)
-          1e-3 * smoothed.cumulative
+      x =  (if (prevalence)
+        1e-3 * smoothed.cumulative
         else
-          smoothed.cumulative
-      ),
+          smoothed.cumulative),
       y = 100 * smoothed.increase / smoothed.cumulative,
       label = region,
       color = region
@@ -56,14 +56,21 @@ plot_growthvssize = function(data, type, prevalence) {
         100 * smoothed.increase / smoothed.cumulative,
         NA
       )
-    ), shape = "diamond", size = 4) +
+    ),
+    shape = "diamond",
+    size = 4) +
     scale_x_log10(labels = decimal_trunc) +
     scale_y_log10(labels = decimal_trunc) +
-    labs(x = paste(type, (if (prevalence)
-      "as percentage of population"
-      else
-        "")),
+    labs(
+      x = paste(type, (if (prevalence)
+        "as percentage of population"
+        else
+          "")),
       y = "Daily new as percentage of cumulative",
-      caption = element_text("Horizontal lines represent exponential growth. Diagonal lines represent equal number of new cases per day.\n Each dot is one day. Diamond shapes are start dates of shelter-in-place order (US states only and incomplete).", margin = 0)) +
+      caption = element_text(
+        "Horizontal lines represent exponential growth. Diagonal lines represent equal number of new cases per day.\n Each dot is one day. Diamond shapes are start dates of shelter-in-place order (US states only and incomplete).",
+        margin = 0
+      )
+    ) +
     theme_covid
 }
