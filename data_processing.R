@@ -53,9 +53,9 @@ is_country = function(x) {
 }
 
 has_subregions = list(
-  country =  corona[is_state(corona),]$country %>% unique,
-  state = discard(corona[is_county(corona),]$state %>% unique, is.na),
-  county = discard(corona[is_city(corona),]$county %>% unique, is.na)
+  country =  corona[is_state(corona), ]$country %>% unique,
+  state = discard(corona[is_county(corona), ]$state %>% unique, is.na),
+  county = discard(corona[is_city(corona), ]$county %>% unique, is.na)
 )
 all_dates = unique(corona$date)
 # all_types = unique(corona$type)
@@ -120,8 +120,8 @@ set_region = function(data,
 }
 
 decimal_trunc = function(x) {
-      round(x*100)/100
-  }
+  round(x * 100) / 100
+}
 
 cdiff = function(x, bottom) {
   #this is wrong
@@ -175,7 +175,7 @@ more_columns = function(data, prevalence) {
   mutate(
     data,
     value = value / (if (prevalence)
-      population/1E5
+      population / 1E5
       else
         1),
     bottom = .1 / if (prevalence)
@@ -190,7 +190,7 @@ more_columns = function(data, prevalence) {
     mutate(
       increase = cdiff(cumulative, bottom),
       smoothed.increase = cdiff(smoothed.cumulative, bottom),
-      ratio = smoothed.increase/smoothed.cumulative
+      ratio = smoothed.increase / smoothed.cumulative
     ) %>%
     mutate(
       log2.cumulative = safe_log2(cumulative, bottom),
@@ -201,9 +201,17 @@ more_columns = function(data, prevalence) {
     filter(date > min(date))
 }
 
-high_cases_regions = function(data, n) {
+high_cases_regions = function(data, level, type, top_region, prevalence, n) {
   (
-    data %>%
+    process_data(
+      data = data,
+      level = level,
+      type = type,
+      top_region = top_region,
+      regions = NULL,
+      date_range = NULL,
+      prevalence = prevalence
+    ) %>%
       filter(date == max(date)) %>%
       group_by(region) %>%
       arrange(-smoothed.increase) %>%
