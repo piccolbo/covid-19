@@ -153,32 +153,9 @@ fixed_length_smooth = function(x, y) {
     list(x = x, y = y)
   }
   else {
-    # start = min(which(y > log(0.1))) - 1
-    # if (length(x) - start < 10) {
-    if (TRUE) {
-      # disable lowess for now, very strange artifacts
       ss = supsmu(x, y)
       sx = ss$x
       sy = ss$y
-    }
-    else{
-      if (start > 0) {
-        startx = head(x, start)
-        x = tail(x, -start)
-        starty = head(y, start)
-        y = tail(y, -start)
-      }
-      else {
-        startx = numeric()
-        starty = numeric()
-      }
-      ss = lowess(x = x,
-                  y = y,
-                  f = 10 / length(x))
-      x = c(startx, x)
-      sx = c(startx, ss$x)
-      sy = c(starty, ss$y)
-    }
     safe_approx(sx, sy, x)
   }
 }
