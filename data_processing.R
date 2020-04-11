@@ -120,7 +120,7 @@ set_region = function(data,
 }
 
 decimal_trunc = function(x) {
-  round(x * 100) / 100
+  as.numeric(format(x = x, digits = 2, scientific = FALSE))
 }
 
 cdiff = function(x, bottom) {
