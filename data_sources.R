@@ -3,6 +3,25 @@ library(readr)
 library(tidyr)
 library(lubridate)
 
+jhu_types = c(cases = "confirmed", deaths = "deaths")
+
+jhu = bind_rows(lapply(jhu_types , function(type)
+  read_csv(
+    paste0(
+      "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_",
+      type ,
+      "_global.csv"
+    ),
+    guess_max = 1e6
+  )),
+  .id = "type") %>%
+  pivot_longer(cols = ends_with("/20"),
+               names_to = "date",
+               values_to = "value") %>%
+  mutate(date = mdy(paste0(date, "20"))) %>%
+  rename(state = `Province/State`, country = `Country/Region`) %>%
+  mutate(country = ifelse(country == "US", "United States", country))
+
 nyt_us_states =
   read_csv(
     "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
@@ -41,6 +60,18 @@ nyt_us_counties =
 #     ux
 # }
 #
+
+# pop =
+#   read_csv("ts.csv.zip", guess_max = 1e6) %>%
+#   filter(!grepl(pattern = ",", x = county)) %>% #kill funky last day and combo counties
+#   tidyr::separate(col = "county", into = "county", sep = " County") %>% # remove useless County from County names
+#   tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
+#   group_by(city, county, state, country) %>%
+#   summarise(population = naggregate(population))
+# save(pop, file = "pop.rdata")
+load("pop.rdata")
+
+
 
 lockdown =
   c(
@@ -83,3 +114,18 @@ lockdown =
     `West Virgina` = "2020-03-24",
     Wisconsin = "2020-03-24"
   )
+
+jhu = left_join(jhu, pop)
+nyt_us_counties = left_join(nyt_us_counties, pop)
+nyt_us_states = left_join(left_join(nyt_us_states, pop),
+                          data.frame(state = names(lockdown), lockdate = ymd(lockdown)))
+
+
+
+corona =
+  bind_rows(jhu %>% filter(country != "United States" |
+                             is.na(state)),
+            nyt_us_counties,
+            nyt_us_states)
+
+
