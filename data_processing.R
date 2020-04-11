@@ -219,8 +219,34 @@ high_cases_regions = function(data, level, type, top_region, prevalence, n) {
   )$region
 }
 
-belong_to_level = function(location, data, level) {
-  all(location %in% data[[level]])
+# belong_to_level = function(location, data, level) {
+#   all(location %in% data[[level]])
+# }
+
+regions_at_level = function(data, level) {
+  unique(
+    filter_data(
+      data = data,
+      level = level,
+      type = "cases",
+      top_region = NULL,
+      regions = NULL,
+      date_range = NULL
+    )[[level]]
+  )
+}
+
+subregions_of = function(data, level, region) {
+  unique(
+    filter_data(
+      data = data,
+      level = level,
+      top_region = region,
+      type = "cases",
+      regions = NULL,
+      date_range = NULL
+    )[[level]]
+  )
 }
 
 process_data = function(data,
