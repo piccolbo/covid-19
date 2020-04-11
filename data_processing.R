@@ -4,162 +4,31 @@ library(purrr)
 library(tidyr)
 library(lubridate)
 
-#data read and one-time processing
 
-df2named_vector = function(keys, values, data = NULL) {
-  if (!is.null(data)) {
-    keys = data[[keys]]
-    values = data[[values]]
-  }
-  v = values
-  names(v) = keys
-  v
-}
-
-three_letter2country = function(x) {
-  map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
-  unlist(ifelse(is.na(map[x]), x, map[x]))
-}
-
-expand_country_names = function(data) {
-  mutate(data, country = three_letter2country(country))
-}
-
-monotonize = function(x) {
-  c(x[1], pmax(head(x, -1), tail(x, -1)))
-}
-
-
-tf = tempfile(fileext = ".csv.zip")
-download.file(url = "https://coronadatascraper.com/timeseries-tidy.csv.zip", destfile = tf)
+# df2named_vector = function(keys, values, data = NULL) {
+#   if (!is.null(data)) {
+#     keys = data[[keys]]
+#     values = data[[values]]
+#   }
+#   v = values
+#   names(v) = keys
+#   v
+# }
+#
+# three_letter2country = function(x) {
+#   map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
+#   unlist(ifelse(is.na(map[x]), x, map[x]))
+# }
+#
+# expand_country_names = function(data) {
+#   mutate(data, country = three_letter2country(country))
+# }
+#
+# monotonize = function(x) {
+#   c(x[1], pmax(head(x,-1), tail(x,-1)))
+# }
 
 
-atlas = read_csv(
-    file = tf,
-    col_types = cols(
-    city = col_character(),
-    county = col_character(),
-    state = col_character(),
-    country = col_character(),
-    population = col_double(),
-    lat = col_double(),
-    long = col_double(),
-    aggregate = col_character(),
-    tz = col_character(),
-    date = col_date(format = ""),
-    type = col_character(),
-    value = col_double()
-  )
-) %>%
-  dplyr::select(city, county, state, country, population, date, type, value) %>% #just what we need
-  expand_country_names %>% # readable country names
-  filter (date != max(date) &
-            !grepl(pattern = ",", x = county)) %>% #kill funky last day and combo counties
-  tidyr::separate(col = "county", into = "county", sep = " County") %>% # remove useless County from County names
-  tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
-  group_by(city, county, state, country, type) %>% arrange(date) %>%
-  mutate(value = monotonize(value)) %>% ungroup #correct declining cumulative counts
-
-unlink(tf)
-
-# return a unique item dropping NAs or NA if it's the only one
-naggregate = function(x) {
-  ux = unique(discard(x, is.na))
-  if (length(ux) == 0)
-    NA
-  else
-    ux
-}
-
-nyt_us_states =
-  read_csv(
-    "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
-    guess_max = 1e6
-  ) %>%
-  mutate(city = NA_character_,
-         county = NA_character_,
-         country = "United States") %>%
-  select (-fips) %>%
-  pivot_longer(
-    cols = c("cases", "deaths"),
-    names_to = "type",
-    values_to = "value"
-  )
-
-nyt_us_counties =
-  read_csv(
-    "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv",
-    guess_max = 1e6
-  ) %>%
-  mutate(city = NA_character_, country = "United States") %>%
-  select (-fips) %>%
-  pivot_longer(
-    cols = c("cases", "deaths"),
-    names_to = "type",
-    values_to = "value"
-  )
-
-
-pop =
-  atlas %>%
-  filter(country == "United States") %>%
-  group_by(city, county, state, country) %>%
-  summarise(population = naggregate(population))
-
-
-lockdown =
-  c(
-    Alabama = "2020-04-04",
-    Alaska = "2020-03-28",
-    Arizona = "2020-03-31",
-    California = "2020-03-19",
-    Colorado = "2020-03-26",
-    Connecticut = "2020-03-23",
-    Delaware = "2020-03-24",
-    Florida = "2020-04-01",
-    Georgia = "2020-04-03",
-    Hawaii = "2020-03-25",
-    Illinois = "2020-03-21",
-    Indiana = "2020-03-25",
-    Kansas = "2020-03-19",
-    Kentucky = "2020-03-26",
-    Louisiana = "2020-03-23",
-    Maine = "2020-04-01",
-    Maryland = "2020-03-30",
-    Massachusetts = "2020-03-24",
-    Michigan = "2020-03-24",
-    Minnesota = "2020-03-27",
-    Mississippi = "2020-04-05",
-    Missouri = "2020-04-06",
-    Montana = "2020-03-10",
-    Nevada = "2020-03-21",
-    `New Hampshire` = "2020-03-27",
-    `New Jersey` = "2020-03-21",
-    `New Mexico` = "2020-03-24",
-    `New York` = "2020-03-22",
-    `North Carolina` = "2020-03-30",
-    Ohio = "2020-03-23",
-    Oregon = "2020-03-23",
-    Pennsylvania = "2020-04-01",
-    Tennessee = "2020-03-31",
-    Texas = "2020-04-02",
-    Vermont = "2020-03-25",
-    Washington = "2020-03-23",
-    `West Virgina` = "2020-03-24",
-    Wisconsin = "2020-03-24"
-  )
-
-nyt_us_counties = left_join(nyt_us_counties, pop)
-nyt_us_states = left_join(left_join(nyt_us_states, pop),
-                          data.frame(state = names(lockdown), lockdate = ymd(lockdown)))
-
-
-
-corona =
-  bind_rows(atlas %>% filter(country != "United States" |
-                               is.na(state)),
-            nyt_us_counties,
-            nyt_us_states)
 
 
 
