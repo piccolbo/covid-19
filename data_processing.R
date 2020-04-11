@@ -89,17 +89,6 @@ filter_data = function(data,
   level = match.arg(level)
   top_level = one_level_up(level)
   typ = match.arg(type)
-  if (level == "country") {
-    top_region = NULL
-  }
-  else {
-    if (!belong_to_level(top_region, data, one_level_up(level))) {
-      top_region = NULL
-    }
-  }
-  if (!belong_to_level(regions, data, level)) {
-    regions = NULL
-  }
 
   level_filter = list(
     city = is_city,
