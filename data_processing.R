@@ -301,10 +301,14 @@ trend_calc = function(data) {
     mutate(
       growth.rate = 2 ** log2.growth.rate,
       doubling.time = decimal_trunc(1 / log2.growth.rate)
-      ) %>%
+    ) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
       latest.increase = decimal_trunc(2 ** log2.latest.increase)
     ) %>%
-    dplyr::select(-starts_with("model"),-starts_with("log2"),-growth.rate,-population)
+    dplyr::select(-starts_with("model"),
+                  -starts_with("log2"),
+                  -growth.rate,
+                  -population)
 }
+
