@@ -8,6 +8,7 @@ library(DT)
 
 options(DT.fillContainer = FALSE)
 options(DT.autoHideNavigation = FALSE)
+options(shiny.reactlog = TRUE)
 
 ui <- fluidPage(titlePanel(
   paste(
@@ -45,11 +46,10 @@ sidebarLayout(
       selected = "country",
       inline = TRUE
     ),
-    selectizeInput(
-      "top_region",
-       "",
-      choices = NULL,
-      multiple = FALSE),
+    selectizeInput("top_region",
+                   "",
+                   choices = NULL,
+                   multiple = FALSE),
     selectizeInput(
       "regions",
       label = "Regions to show data from (biggest current outbreaks shown, click for more)",
@@ -94,54 +94,34 @@ server <- function(input, output, session) {
     }
   })
 
-
-  current_top_region = reactive({
-  spy ( if (input$level == "country")
-      NULL
+  top_region_choices = reactive({
+    if (input$level == "country")
+      c()
     else {
       top_regions = has_subregions[[one_level_up(input$level)]]
-      if (input$top_region %in% top_regions) {
+    }
+  })
+
+  current_top_region = reactive({
+    if (input$level == "country")
+      NULL
+    else {
+      if (input$top_region %in% top_region_choices()) {
         input$top_region
       }
       else
-        intersect(high_cases_regions(
-          data = corona,
-          level = one_level_up(input$level),
-          type = input$type,
-          top_region = NULL,
-          prevalence = input$prevalence,
-          n = 100
-        ), top_regions)[1]
+        intersect(
+          high_cases_regions(
+            data = corona,
+            level = one_level_up(input$level),
+            type = input$type,
+            top_region = NULL,
+            prevalence = input$prevalence,
+            n = 100
+          ),
+          top_region_choices()
+        )[1]
     }
-)  })
-
-
-  current_regions = reactive({
-    regions = input$regions
-    #drop regions at incorrect level
-    regions = intersect(regions, regions_at_level(data = corona, level =  input$level))
-    #drop regions not belonging to top region
-    if(!is.null(current_top_region()))
-      regions = intersect(regions,
-                        subregions_of(
-                          data = corona,
-                          level = input$level,
-                          region = current_top_region()
-                        ))
-    #if empty replace with default
-    if (length(regions) == 0)
-      regions =   high_cases_regions(
-        data = corona,
-        level = input$level,
-        type = input$type,
-        top_region =
-          current_top_region(),
-        prevalence = input$prevalence,
-        n = 12
-      )
-    message("current_regions")
-    message(paste(regions))
-    regions
   })
 
   #top_region selector
@@ -155,17 +135,11 @@ server <- function(input, output, session) {
                      choices =  NULL,
                      selected = NULL,
                      server = TRUE
-                   )                 }
-                 else{
-                   choices = has_subregions[[one_level_up(input$level)]]
-                   selected = high_cases_regions(
-                     data = corona,
-                     level =  one_level_up(input$level),
-                     type =  input$type,
-                     top_region = NULL,
-                     prevalence = input$prevalence,
-                     n = 1
                    )
+                 }
+                 else{
+                   choices = top_region_choices()
+                   selected = current_top_region()
                    updateSelectizeInput(
                      session = session,
                      inputId = "top_region",
@@ -177,32 +151,44 @@ server <- function(input, output, session) {
                  }
                })
 
-  #regions selector
-  observeEvent({
-    list(input$level,
-    current_top_region())
-  },
-  {
-    choices = if (input$level == "country")
-      regions_at_level(data = corona, level = input$level)
+  region_choices = reactive({
+    if (input$level == "country")
+      regions_at_level(data = corona, level = "country")
     else
       subregions_of(data = corona,
                     level = input$level,
                     region = current_top_region())
-    selected = high_cases_regions(
-      data = corona,
-      level = input$level,
-      type = input$type,
-      top_region = current_top_region(),
-      input$prevalence,
-      n = 12
-    )
+  })
+
+  current_regions = reactive({
+    regions = input$regions
+    #drop regions not in current range
+    if(!all(regions %in% region_choices())||length(regions) == 0) #presumable change of level
+      regions =   high_cases_regions(
+        data = corona,
+        level = input$level,
+        type = input$type,
+        top_region =
+          current_top_region(),
+        prevalence = input$prevalence,
+        n = 12
+      )
+    regions
+  })
+
+
+  #regions selector
+  observeEvent({
+    list(input$level,
+         current_top_region())
+  },
+  {
     updateSelectizeInput(
       session = session,
       inputId = "regions",
       label = "Regions to show data from (biggest current outbreaks shown, click for more)",
-      choices = choices,
-      selected = selected,
+      choices = region_choices(),
+      selected = current_regions(),
       server = TRUE
     )
   })
@@ -266,7 +252,7 @@ server <- function(input, output, session) {
     strsplit(date(), " ")[[1]][1:3]
   ))
 
-    output$stats = renderDataTable({
+  output$stats = renderDataTable({
     message("output$stats")
     trend_calc(
       data = process_data(
