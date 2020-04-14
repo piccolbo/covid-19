@@ -126,9 +126,7 @@ decimal_trunc = function(x) {
 }
 
 cdiff = function(x, bottom) {
-  #this is wrong
-  stopifnot(length(unique(bottom)) == 1)
-  bottom = unique(bottom)
+    bottom = mean(bottom, na.rm = TRUE)
   pmax(bottom, c(bottom, diff(x)))
 }
 
@@ -152,19 +150,17 @@ fixed_length_smooth = function(x, y) {
 }
 
 logsmooth = function(x, bottom) {
-  if (all(is.na(x))) {
+  if (all(is.na(x)))
     rep_len(NA_real_, length(x))
-  }
-  else {
-    y = pmax(bottom, x)
-    # pmax(bottom, fixed_length_smooth(1:length(y), y)$y)
-    pmax(bottom, exp(fixed_length_smooth(1:length(y), log(y))$y))
-  }
+  else
+    pmax(bottom,
+         fixed_length_smooth(1:length(x),
+                                 x )$y)
 }
 
 safe_log2 = function(x, bottom)
 {
-  log2(pmax(x, bottom))
+  log2(pmax(x + bottom, bottom))
 }
 
 spy = function(x, f = identity) {
@@ -258,7 +254,7 @@ process_data = function(data,
   level = match.arg(level)
   type = match.arg(type)
   message(paste(
-    c(level, type, top_region, regions),
+    c(level, type, top_region, regions, date_range[1], date_range[2], prevalence),
     sep = " :: ",
     collapse = " : "
   ))
