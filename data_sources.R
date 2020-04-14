@@ -121,11 +121,27 @@ nyt_us_states = left_join(left_join(nyt_us_states, pop),
                           data.frame(state = names(lockdown), lockdate = ymd(lockdown)))
 
 
+tf = tempfile(fileext = ".csv.zip")
+download.file(url = "https://coronadatascraper.com/timeseries-tidy.csv.zip", destfile = tf)
+cds = read_csv(file = tf, guess_max = 1e6) %>%
+  filter(!grepl(pattern = ",", x = county)) %>% #kill funky combo counties
+  tidyr::separate(col = "county", into = "county", sep = " County") %>% # remove useless County from County names
+  tidyr::separate(col = "county", into = "county", sep = " Parish") # same with Parish
+unlink(tf)
 
+mwna = function(x, y=x){y[min(1,min(which(!is.na(x))))] }
 corona =
-  bind_rows(jhu %>% filter(country != "United States" |
+  bind_rows(jhu = jhu %>% filter(country != "United States" |
                              is.na(state)),
-            nyt_us_counties,
-            nyt_us_states)
+            nyt_counties = nyt_us_counties,
+            nyt_states = nyt_us_states,
+            cds = cds,
+            .id = "source") %>%
+  tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
+  group_by(city, county, state, country, date, type) %>%
+  summarize(value = median(value), population = median(population), lockdate = median(lockdate)) %>%
+  ungroup
+  # summarize(source = mwna(source, value), value = mwna(value), population = mwna(population), lockdate = mwna(lockdate)) %>% View
 
+save(corona, file = "data-sources.Rdata")
 
