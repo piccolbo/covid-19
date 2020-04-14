@@ -4,6 +4,8 @@ library(purrr)
 library(tidyr)
 library(lubridate)
 
+load("data-sources.Rdata")
+
 
 # df2named_vector = function(keys, values, data = NULL) {
 #   if (!is.null(data)) {
@@ -53,9 +55,9 @@ is_country = function(x) {
 }
 
 has_subregions = list(
-  country =  corona[is_state(corona), ]$country %>% unique,
-  state = discard(corona[is_county(corona), ]$state %>% unique, is.na),
-  county = discard(corona[is_city(corona), ]$county %>% unique, is.na)
+  country =  corona[is_state(corona), ]$country %>% unique %>% sort,
+  state = discard(corona[is_county(corona), ]$state %>% unique %>% sort, is.na),
+  county = discard(corona[is_city(corona), ]$county %>% unique %>% sort, is.na)
 )
 all_dates = unique(corona$date)
 # all_types = unique(corona$type)
@@ -219,34 +221,31 @@ high_cases_regions = function(data, level, type, top_region, prevalence, n) {
   )$region
 }
 
-# belong_to_level = function(location, data, level) {
-#   all(location %in% data[[level]])
-# }
 
 regions_at_level = function(data, level) {
-  unique(
-    filter_data(
-      data = data,
-      level = level,
-      type = "cases",
-      top_region = NULL,
-      regions = NULL,
-      date_range = NULL
-    )[[level]]
-  )
+  filter_data(
+    data = data,
+    level = level,
+    type = "cases",
+    top_region = NULL,
+    regions = NULL,
+    date_range = NULL
+  )[[level]] %>%
+    unique %>%
+    sort
 }
 
 subregions_of = function(data, level, region) {
-  unique(
-    filter_data(
-      data = data,
-      level = level,
-      top_region = region,
-      type = "cases",
-      regions = NULL,
-      date_range = NULL
-    )[[level]]
-  )
+  filter_data(
+    data = data,
+    level = level,
+    top_region = region,
+    type = "cases",
+    regions = NULL,
+    date_range = NULL
+  )[[level]] %>%
+    unique %>%
+    sort
 }
 
 process_data = function(data,

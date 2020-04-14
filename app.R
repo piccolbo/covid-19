@@ -1,4 +1,3 @@
-source("data_sources.R")
 source("data_processing.R")
 source("plots.R")
 
@@ -173,7 +172,7 @@ server <- function(input, output, session) {
         prevalence = input$prevalence,
         n = 12
       )
-    regions
+    sort(regions)
   })
 
 
