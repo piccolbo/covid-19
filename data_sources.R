@@ -50,8 +50,17 @@ nyt_us_counties =
     values_to = "value"
   )
 
+ctp_us_states =
+  read_csv("https://covidtracking.com/api/v1/states/daily.csv", guess_max = 1e6) %>%
+  mutate(date = lubridate::ymd(date),
+            city = NA_character_,
+            county = NA_character_,
+            country = "United States") %>%
+  select(-fips)
 
-# return a unique item dropping NAs or NA if it's the only one
+
+#return a unique item dropping NAs or NA if it's the only one
+
 # naggregate = function(x) {
 #   ux = unique(discard(x, is.na))
 #   if (length(ux) == 0)
@@ -59,7 +68,7 @@ nyt_us_counties =
 #   else
 #     ux
 # }
-#
+
 
 # pop =
 #   read_csv("ts.csv.zip", guess_max = 1e6) %>%
@@ -123,10 +132,27 @@ nyt_us_states = left_join(left_join(nyt_us_states, pop),
 
 tf = tempfile(fileext = ".csv.zip")
 download.file(url = "https://coronadatascraper.com/timeseries-tidy.csv.zip", destfile = tf)
-cds = read_csv(file = tf, guess_max = 1e6) %>%
+cds = read_csv(file = tf, col_types = cols(
+  name = col_character(),
+  level = col_character(),
+  city = col_character(),
+  county = col_character(),
+  state = col_character(),
+  country = col_character(),
+  population = col_double(),
+  lat = col_double(),
+  long = col_double(),
+  aggregate = col_character(),
+  tz = col_character(),
+  date = col_date(format = ""),
+  type = col_character(),
+  value = col_double()
+)) %>%
   filter(!grepl(pattern = ",", x = county)) %>% #kill funky combo counties
   tidyr::separate(col = "county", into = "county", sep = " County") %>% # remove useless County from County names
-  tidyr::separate(col = "county", into = "county", sep = " Parish") # same with Parish
+  tidyr::separate(col = "county", into = "county", sep = "County ") %>% # remove useless County from County names
+  tidyr::separate(col = "county", into = "county", sep = " Parish") %>%  # same with Parish
+  filter(type!="growthFactor")
 unlink(tf)
 
 mwna = function(x, y=x){y[min(1,min(which(!is.na(x))))] }
@@ -135,11 +161,13 @@ corona =
                              is.na(state)),
             nyt_counties = nyt_us_counties,
             nyt_states = nyt_us_states,
+#            ctp_us_states = ctp_us_states,
             cds = cds,
             .id = "source") %>%
   tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
+  tidyr::separate(col = "county", into = "county", sep = "County ") %>%
   group_by(city, county, state, country, date, type) %>%
-  summarize(value = median(value), population = median(population), lockdate = median(lockdate)) %>%
+  summarize(value = first(value), population = median(population), lockdate = first(lockdate), source = first(source)) %>%
   ungroup
   # summarize(source = mwna(source, value), value = mwna(value), population = mwna(population), lockdate = mwna(lockdate)) %>% View
 

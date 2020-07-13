@@ -7,33 +7,6 @@ library(lubridate)
 load("data-sources.Rdata")
 
 
-# df2named_vector = function(keys, values, data = NULL) {
-#   if (!is.null(data)) {
-#     keys = data[[keys]]
-#     values = data[[values]]
-#   }
-#   v = values
-#   names(v) = keys
-#   v
-# }
-#
-# three_letter2country = function(x) {
-#   map = df2named_vector("Alpha_3", "Name", ISOcodes::ISO_3166_1)
-#   unlist(ifelse(is.na(map[x]), x, map[x]))
-# }
-#
-# expand_country_names = function(data) {
-#   mutate(data, country = three_letter2country(country))
-# }
-#
-# monotonize = function(x) {
-#   c(x[1], pmax(head(x,-1), tail(x,-1)))
-# }
-
-
-
-
-
 
 # filtering
 
@@ -90,15 +63,17 @@ filter_data = function(data,
                        date_range) {
   level = match.arg(level)
   top_level = one_level_up(level)
-  typ = match.arg(type)
-
+  typ = type# if(!is.null(type)) match.arg(type) else NULL
   level_filter = list(
     city = is_city,
     county = is_county,
     state = is_state,
     country = is_country
   )[[level]]
-  data = filter(data, level_filter(data), type == typ)
+  data = filter(data, level_filter(data))
+  if(!is.null(typ)) {
+    data = filter(data, typ == type)
+  }
   if (!is.null(top_region)) {
     data = filter_(data, paste(top_level,  " == top_region"))
   }
@@ -125,42 +100,42 @@ decimal_trunc = function(x) {
   as.numeric(format(x = x, digits = 2, scientific = FALSE))
 }
 
-cdiff = function(x, bottom) {
-    bottom = mean(bottom, na.rm = TRUE)
-  pmax(bottom, c(bottom, diff(x)))
-}
-
-safe_approx = function(x, y, newx) {
-  if (length(x) < 2)
-    list(x = x, y = y)
-  else
-    approx(x, y, newx)
-}
+cdiff = function(x) {
+        c(NA, diff(x))
+ }
 
 fixed_length_smooth = function(x, y) {
   if (length(x) < 3) {
     list(x = x, y = y)
   }
   else {
-      ss = supsmu(x, y)
-      sx = ss$x
-      sy = ss$y
-    safe_approx(sx, sy, x)
+    ss = supsmu(x, log(y + 1))
+    sx = ss$x
+    sy = ss$y
+    ret = approx(sx, sy, x)
+    ret$y = exp(ret$y)-1
+    ret
   }
 }
 
-logsmooth = function(x, bottom) {
+fixed_length_smooth_1 = function(x, y) {
+  if (length(x) < 3) {
+    list(x = x, y = y)
+  }
+  else {
+    ss = supsmu(x, y)
+    sx = ss$x
+    sy = ss$y
+    ret = approx(sx, sy, x)
+    ret
+  }
+}
+
+pos_smooth = function(x) {
   if (all(is.na(x)))
     rep_len(NA_real_, length(x))
   else
-    pmax(bottom,
-         fixed_length_smooth(1:length(x),
-                                 x )$y)
-}
-
-safe_log2 = function(x, bottom)
-{
-  log2(pmax(x + bottom, bottom))
+    pmax(0,fixed_length_smooth(1:length(x), x)$y)
 }
 
 spy = function(x, f = identity) {
@@ -168,6 +143,13 @@ spy = function(x, f = identity) {
   x
 }
 
+very_small = function(population, prevalence) {
+  if(prevalence) 1E5/population else 1
+}
+
+active = function(new) {
+  reduce(lapply(0:14, function(l) lag(new, l)), `+`)/15
+}
 
 more_columns = function(data, prevalence) {
   mutate(
@@ -175,26 +157,22 @@ more_columns = function(data, prevalence) {
     value = value / (if (prevalence)
       population / 1E5
       else
-        1),
-    bottom = .1 / if (prevalence)
-      population
-    else
-      1
+        1)
   ) %>%
     rename(cumulative = value) %>%
     group_by(region) %>%
     arrange(date) %>%
-    mutate(smoothed.cumulative = logsmooth(cumulative, bottom)) %>%
+    mutate(smoothed.cumulative = pos_smooth(cumulative)) %>%
     mutate(
-      increase = cdiff(cumulative, bottom),
-      smoothed.increase = cdiff(smoothed.cumulative, bottom),
-      ratio = smoothed.increase / smoothed.cumulative
-    ) %>%
-    mutate(
-      log2.cumulative = safe_log2(cumulative, bottom),
-      log2.smoothed.cumulative = safe_log2(smoothed.cumulative, bottom),
-      log2.increase = safe_log2(increase, bottom),
-      log2.smoothed.increase = safe_log2(smoothed.increase, bottom)
+      new = cdiff(cumulative),
+      smoothed.new = cdiff(smoothed.cumulative),
+      active = active(smoothed.new),
+      ratio = ifelse(
+        active > very_small(population, prevalence),
+        (smoothed.new + very_small(population, prevalence)) /
+          (active + very_small(population, prevalence)),
+        NA
+      )
     ) %>%
     filter(date > min(date))
 }
@@ -212,7 +190,7 @@ high_cases_regions = function(data, level, type, top_region, prevalence, n) {
     ) %>%
       filter(date == max(date)) %>%
       group_by(region) %>%
-      arrange(-smoothed.increase) %>%
+      arrange(-smoothed.new) %>%
       head(n)
   )$region
 }
@@ -252,7 +230,6 @@ process_data = function(data,
                         date_range,
                         prevalence) {
   level = match.arg(level)
-  type = match.arg(type)
   message(paste(
     c(level, type, top_region, regions, date_range[1], date_range[2], prevalence),
     sep = " :: ",
@@ -280,11 +257,11 @@ trend_calc = function(data) {
     group_by(region) %>%
     arrange(date) %>%
     summarize(
-      model1 = if (all(is.na(log2.smoothed.increase)))
+      model1 = if (all(is.na(log2.smoothed.new)))
         list(NULL)
       else
-        list(lm(formula = log2.smoothed.increase ~ date)),
-      log2.latest.increase = last(log2.smoothed.increase),
+        list(lm(formula = log2.smoothed.new ~ date)),
+      log2.latest.new = last(log2.smoothed.new),
       latest.cumulative = decimal_trunc(last(cumulative)),
       population = last(population)
     ) %>%
@@ -299,7 +276,7 @@ trend_calc = function(data) {
     ) %>%
     mutate(
       daily.growth.percent = trunc((growth.rate - 1) * 100),
-      latest.increase = decimal_trunc(2 ** log2.latest.increase)
+      latest.new = decimal_trunc(2 ** log2.latest.new)
     ) %>%
     dplyr::select(-starts_with("model"),
                   -starts_with("log2"),
