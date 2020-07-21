@@ -58,6 +58,13 @@ ctp_us_states =
             country = "United States") %>%
   select(-fips)
 
+ctp_us = read_csv("https://covidtracking.com/api/v1/us/daily.csv", guess_max = 1e6) %>%
+  mutate(date = lubridate::ymd(date),
+         city = NA_character_,
+         county = NA_character_,
+         state = NA_character_,
+         country = "United States")
+
 
 #return a unique item dropping NAs or NA if it's the only one
 
@@ -161,7 +168,8 @@ corona =
                              is.na(state)),
             nyt_counties = nyt_us_counties,
             nyt_states = nyt_us_states,
-#            ctp_us_states = ctp_us_states,
+            ctp_us_states = ctp_us_states,
+            ctp_us = ctp_us,
             cds = cds,
             .id = "source") %>%
   tidyr::separate(col = "county", into = "county", sep = " Parish") %>%
