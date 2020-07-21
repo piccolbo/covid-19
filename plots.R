@@ -18,7 +18,10 @@ plot_timeseries = function(data, type, smoothing, prevalence) {
     geom_dl(method = "angled.boxes") +
     scale_y_log10(
       labels = identity,
-      limits =c(if (prevalence) .01 else 1, NA)) +
+      limits =c(quantile(if (smoothing)
+        data$smoothed.new
+        else
+          data$new, prob = .01, na.rm = TRUE), NA)) +
     ylab(paste("New daily",
                type,
                (if (prevalence)
